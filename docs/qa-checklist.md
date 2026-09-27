@@ -15,6 +15,8 @@
 - [x] DeepSeek `deepseek-flash` non-thinking JSON generation returns a non-fallback browser artifact within the configured limit. (Temporary `ShelfTrack` project verified and deleted on 2026-09-28.)
 - [x] Version-scoped preview state persists after a fresh workspace read. (Temporary API project verified and deleted on 2026-09-27.)
 - [x] A running generation persists analysis, planning, and generation events before completion; the Builder can poll that state and read the completed validation event. (Temporary API project verified and deleted on 2026-09-28.)
+- [x] Generation records truthful structured execution events for blueprint request/response, artifact validation, per-file writes, version save, and preview readiness. Legacy four-step logs remain readable through optional event fields. (API QA verified on 2026-09-28.)
+- [x] DeepSeek two-stage non-thinking generation produced a non-fallback `纸间书斋` reading dashboard with search, statistic/category filters, editing, progress updates, and status changes. It saved the four permitted files and 13 persisted events; the temporary project was deleted on 2026-09-28.
 - [x] A project cannot run concurrent generation jobs. (A PostgreSQL partial unique index and API 409 behavior were exercised by API QA on 2026-09-28.)
 - [x] Generation stores files and a version. (Browser QA verified generated source files and v1 on 2026-09-28.)
 - [x] Regeneration creates a later version, and version history returns both versions in descending order. (Temporary API QA created v1 and v2, verified on 2026-09-28.)
@@ -43,6 +45,7 @@
 - [x] Narrow viewport has no unintended horizontal overflow. (390×844 Browser QA on 2026-09-28; single-column grid width equals viewport width.)
 - [x] Interactive controls visibly change state and remain usable. (Browser QA on 2026-09-28.)
 - [x] Generated iframe preview isolation is manually verified: no parent access or network request, and state-save bridge works from an actual rendered generated application. (Browser QA observed opaque `null` origin, blocked parent access/network, and persisted a preview interaction on 2026-09-28.)
+- [ ] The longer structured-event timeline needs a final Playwright visual pass after installing/connecting a Playwright browser in this workspace. (The current Codex session has no `js_repl` and this repository has no importable `playwright` package; API and production-build checks passed on 2026-09-28.)
 
 ## Delivery checks
 

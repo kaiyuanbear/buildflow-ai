@@ -83,8 +83,8 @@ The selected initial limits are deliberately bounded:
 
 - Blueprint call: non-thinking JSON, maximum 2,000 output tokens.
 - Artifact call: non-thinking JSON, maximum 12,000 output tokens.
-- API timeout per model call: 90 seconds.
-- At most one optional repair call, maximum 4,000 output tokens, only after a deterministic validation error.
+- API timeout per model call: 90 seconds; the two-call/repair path has a 250-second overall deadline.
+- At most one optional repair call, maximum 12,000 output tokens, only after a deterministic validation error. A complete four-file replacement cannot reliably fit in a smaller output budget.
 - Retain one active generation per project and retain the existing local fallback.
 
 Thinking mode stays explicitly disabled for this flow. It is not necessary to generate the public event summary, increases latency/cost, and would create hidden reasoning content that BuildFlow must not expose. DeepSeek JSON mode remains enabled and all results are schema-validated.
@@ -95,7 +95,7 @@ The implementation must add a global per-generation budget guard so a repair can
 
 Before files are persisted, deterministic checks validate the blueprint/artifact schemas, required file paths, duplicate paths, maximum file count and byte size, entry path, and forbidden browser capabilities. The server logs only coarse reason codes, never prompts, API keys, raw model reasoning, or complete raw errors that could reveal secrets.
 
-After validation, the API persists every accepted file, then creates the immutable version, then marks the job completed. A failed or fallback run records the true outcome and does not claim an AI artifact was created.
+After validation, the API creates the immutable version required by the file foreign key, persists every accepted file against that version, then marks the job completed. A failed or fallback run records the true outcome and does not claim an AI artifact was created.
 
 ## User experience
 
@@ -114,4 +114,3 @@ API tests must cover event ordering, blueprint/artifact validation, invalid mode
 Browser tests must verify that events appear during a run, completed file-write/version events are visible, a generated preview is interactive, regeneration creates a later version, and a fallback is honestly labelled.
 
 Visual QA must cover desktop and narrow Builder layouts with a long event timeline. A three-prompt benchmark (dashboard-like tool, form-centric utility, and presentation/landing page) must show the richer-app acceptance threshold without a fixed prompt-to-template mapping.
-

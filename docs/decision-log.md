@@ -27,3 +27,7 @@ The API no longer starts with a known default JWT secret. `JWT_SECRET` must be p
 ## 2026-09-28: home gallery is presentation-only
 
 The Atoms-inspired home gallery has `发现`, `我的项目`, and `模板` views. Discover and template cards are local, non-interactive visual examples; they do not select or constrain the LLM generation path. My-project cards are derived from the authenticated user's persisted projects and open the existing Builder workspace.
+
+## 2026-09-28: truthful events and two-stage generation
+
+BuildFlow AI records structured server-side execution events rather than exposing model reasoning or simulating unavailable tools. DeepSeek first returns a validated application blueprint, then returns a validated browser-only artifact. Thinking mode remains disabled; all model output is JSON-validated, sandboxed, and subject to bounded output/time limits with a local fallback.

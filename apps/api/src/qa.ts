@@ -68,8 +68,9 @@ async function main() {
     await db.delete(generationJobs).where(and(eq(generationJobs.projectId, projectId), eq(generationJobs.status, "running")));
 
     console.log("QA: generation and preview-state checks");
-    const first = await call<{ version: { id: string; sequence: string }; files: Array<{ path: string }> }>(owner, "POST", `/api/projects/${projectId}/generate`, {});
+    const first = await call<{ job: { logs: Array<{ phase?: string; kind?: string; target?: string }> }; version: { id: string; sequence: string }; files: Array<{ path: string }> }>(owner, "POST", `/api/projects/${projectId}/generate`, {});
     expect(first.statusCode === 201 && first.body.version.sequence === "1" && first.body.files.some((file) => file.path === "index.html"), "First generation must save version 1 and files.");
+    expect(first.body.job.logs.length >= 8 && first.body.job.logs.some((log) => log.kind === "file_write" && log.target === "app.js") && first.body.job.logs.some((log) => log.kind === "preview_ready"), "Generation must persist truthful file-write and preview-ready events.");
     expect((await call<{ code: string }>(guest, "PUT", `/api/projects/${projectId}/versions/${first.body.version.id}/preview-state`, { saved: true })).statusCode === 404, "A second user must not write preview state.");
     expect((await call(owner, "PUT", `/api/projects/${projectId}/versions/${first.body.version.id}/preview-state`, { saved: true, count: 1 })).statusCode === 200, "Preview state must save.");
     const firstWorkspace = await call<{ version: { id: string }; previewState: { saved?: boolean; count?: number } }>(owner, "GET", `/api/projects/${projectId}/workspace`);
