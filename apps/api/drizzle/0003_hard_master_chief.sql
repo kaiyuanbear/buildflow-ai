@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "generation_jobs_one_active_project" ON "generation_jobs" USING btree ("project_id") WHERE "generation_jobs"."status" in ('queued', 'running');

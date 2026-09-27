@@ -1,0 +1,15 @@
+node_modules
+.pnpm-store
+apps/*/node_modules
+apps/*/dist
+packages/*/dist
+.git
+.env
+.env.*
+!.env.example
+playwright-report
+test-results
+coverage
+.playwright-browsers
+output
+tmp

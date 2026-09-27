@@ -17,8 +17,8 @@ Build a runnable AI app-builder demo:
 ## Scope rules
 
 - Implement only the documented BuildFlow AI flow.
-- Use constrained `AppSpec` templates for generation and preview.
-- Do not execute arbitrary user-generated code.
+- Use a validated browser-only generated-artifact contract for generation and preview; do not map prompts to a fixed application catalog.
+- Never execute generated code on the server. Run browser-only preview code only inside the documented sandboxed iframe boundary.
 - Persist projects, jobs, versions and generated files.
 - Prefer a reliable end-to-end demo over additional features.
 

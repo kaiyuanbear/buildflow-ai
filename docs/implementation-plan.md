@@ -1,5 +1,7 @@
 # BuildFlow AI implementation plan
 
+> Superseded details: the current implementation follows the generic artifact design in [`generic-generation-architecture.md`](./generic-generation-architecture.md). The original template-specific milestones below remain historical context until the final documentation cleanup.
+
 ## Architecture
 
 The monorepo has independent frontend and API packages. During development Vite proxies `/api` to Fastify. In production, Fastify serves the built frontend and API from one origin, simplifying cookie authentication and deployment.
@@ -28,7 +30,7 @@ apps/web (React) -- /api --> apps/api (Fastify) --> PostgreSQL
 ### M3: projects and dashboard
 
 - Implement authenticated project CRUD routes.
-- Build login/register screens, dashboard, and new-project flow.
+- Build an Atoms-inspired home screen with sidebar navigation, recent projects, prompt composer, and new-project flow.
 - Verify refresh persistence and empty/error states.
 
 ### M4: generation pipeline
@@ -41,7 +43,7 @@ apps/web (React) -- /api --> apps/api (Fastify) --> PostgreSQL
 
 ### M5: Builder workspace and versions
 
-- Render agent workflow, source files, and AppSpec-driven preview.
+- Render a three-panel Builder workspace: agent timeline/composer, source files/version history, and AppSpec-driven preview.
 - Make preview templates interactive.
 - Add regeneration, version list, and restore.
 - Verify each template, file viewer, generation progress, regenerate, restore, and refresh.

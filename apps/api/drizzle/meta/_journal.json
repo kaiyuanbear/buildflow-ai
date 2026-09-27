@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1790506551443,
+      "tag": "0000_lying_power_pack",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790522114455,
+      "tag": "0001_useful_george_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790524397719,
+      "tag": "0002_loose_alex_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790528597583,
+      "tag": "0003_hard_master_chief",
+      "breakpoints": true
+    }
+  ]
+}
