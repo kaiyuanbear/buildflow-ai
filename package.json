@@ -1,0 +1,18 @@
+{
+  "name": "buildflow-ai",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.13.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @buildflow/api --filter @buildflow/web dev",
+    "build": "pnpm --filter @buildflow/contracts build && pnpm --filter @buildflow/api build && pnpm --filter @buildflow/web build",
+    "typecheck": "pnpm --filter @buildflow/contracts typecheck && pnpm --filter @buildflow/api typecheck && pnpm --filter @buildflow/web typecheck",
+    "lint": "pnpm --filter @buildflow/contracts lint && pnpm --filter @buildflow/api lint && pnpm --filter @buildflow/web lint"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
