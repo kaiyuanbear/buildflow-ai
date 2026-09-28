@@ -17,17 +17,49 @@ type Workspace = {
   previewState: Record<string, unknown>;
 };
 
-const phaseLabels: Record<string, string> = { analysis: "需求分析", planning: "方案规划", generation: "应用生成", validation: "安全校验", persistence: "结果保存", activity: "执行记录", queued: "等待执行" };
-const eventKindLabels: Record<string, string> = { status: "任务状态", model_request: "调用模型", model_response: "模型返回", validation: "校验", file_write: "写入文件", version_save: "保存版本", preview_ready: "预览就绪" };
+const phaseLabels: Record<string, string> = { analysis: "需求分析", planning: "方案规划", generation: "应用生成", validation: "校验与验证", persistence: "结果保存", activity: "执行记录", queued: "等待执行" };
+const eventKindLabels: Record<string, string> = { status: "任务状态", model_request: "调用模型", model_response: "模型返回", validation: "质量校验", file_write: "写入文件", version_save: "保存版本", preview_ready: "预览就绪" };
+
+const legacyTimelineMessages: Record<string, string> = {
+  "Received the product request and created an Agent generation task.": "已接收产品需求，已创建 Agent 生成任务。",
+  "Applied the browser-only preview and safety constraints.": "已应用浏览器预览与安全约束。",
+  "Requesting an application blueprint from the AI model.": "正在请求 AI 生成应用蓝图。",
+  "Validated the application structure, interactions, and visual direction.": "已校验应用结构、交互设计与视觉方向。",
+  "Requesting browser-only source files from the AI model.": "正在请求 AI 生成浏览器端源文件。",
+  "Requesting one bounded safety repair for the generated artifact.": "检测到约束问题，正在请求一次受限修复。",
+  "Prepared files for isolated preview execution.": "已准备隔离预览所需文件。",
+  "Created an immutable project version for the validated artifact.": "已为通过校验的产物创建不可变版本。",
+  "Initialized isolated preview state and made this version current.": "已初始化隔离预览状态，并设为当前版本。"
+};
+
+function displayTimelineMessage(message: string) { return legacyTimelineMessages[message] ?? message; }
 
 function displayTimelineTarget(target?: string) {
   if (!target) return target;
   const labels: Record<string, string> = {
     "application blueprint": "应用蓝图",
     "index.html, styles.css, app.js": "index.html、styles.css、app.js",
-    "4 generated files": "4 个生成文件"
+    "4 generated files": "4 个生成文件",
+    "7-12 generated files": "7–12 个生成文件",
+    "7–12 generated files": "7–12 个生成文件",
+    "structural and safety validation": "结构与安全校验",
+    "quality validation": "质量校验"
   };
   return labels[target] ?? target;
+}
+
+function FileTree({ files, selectedPath, onSelect }: { files: GeneratedFile[]; selectedPath?: string; onSelect: (path: string) => void }) {
+  const roots = files.filter((file) => !file.path.includes("/"));
+  const groups = new Map<string, GeneratedFile[]>();
+  files.filter((file) => file.path.includes("/")).forEach((file) => {
+    const [directory] = file.path.split("/");
+    if (!directory) return;
+    const items = groups.get(directory) ?? [];
+    items.push(file);
+    groups.set(directory, items);
+  });
+  const item = (entry: GeneratedFile, nested = false) => <button className={selectedPath === entry.path ? "file-active" : "file-item"} key={entry.path} onClick={() => onSelect(entry.path)}><span className="file-icon">{entry.language.toUpperCase()}</span><span className={nested ? "file-name file-name-nested" : "file-name"}>{nested ? entry.path.split("/").at(-1) : entry.path}</span></button>;
+  return <div className="file-tree">{roots.map((entry) => item(entry))}{[...groups.entries()].map(([directory, entries]) => <details className="file-group" key={directory} open><summary><span>▾</span><b>{directory}/</b><small>{entries.length}</small></summary>{entries.map((entry) => item(entry, true))}</details>)}</div>;
 }
 
 const discoverSamples: ShowcaseItem[] = [
@@ -177,5 +209,5 @@ function Builder({ project, back, startGeneration, onGenerationStarted }: { proj
 
   const isHistoricalVersion = Boolean(data?.version && data.version.id !== data.project.currentVersionId);
   const statusText = isGenerating || data?.job?.status === "running" ? "智能体正在构建应用" : data?.job?.status === "failed" ? "构建失败" : data?.version ? "构建完成" : "等待构建";
-  return <main className="workspace"><header className="workspace-head"><button className="quiet-button" onClick={back}>← 首页</button><b>{data?.version?.appSpec.appName ?? project.name}</b><span className={isGenerating ? "workspace-status workspace-status-working" : "workspace-status"}>{statusText}</span></header><section className="workspace-grid"><aside className="agent-panel"><p className="eyebrow">AGENT 执行过程</p><h3>{statusText}</h3>{data?.job?.logs.map((log, index) => { const phase = log.phase ?? log.stage ?? "activity"; const active = log.status === "active" || (isGenerating && index === (data.job?.logs.length ?? 0) - 1); const failed = log.status === "failed"; return <div className={`timeline ${active ? "timeline-active" : ""} ${failed ? "timeline-failed" : ""}`} key={`${phase}-${log.target ?? ""}-${index}`}><b>{failed ? "!" : active ? "•" : "✓"}</b><div><small>{phaseLabels[phase] ?? phase}{log.kind ? ` · ${eventKindLabels[log.kind] ?? log.kind}` : ""}</small><p>{log.message}</p>{log.target && <span className="timeline-target">{displayTimelineTarget(log.target)}</span>}</div></div>; })}{isGenerating && !data?.job && <div className="timeline timeline-active"><b>•</b><div><small>等待执行</small><p>正在创建 Agent 任务…</p></div></div>}{data?.job?.status === "failed" && <button className="retry-button" onClick={() => void runGeneration()}>重新尝试生成</button>}<form className="composer" onSubmit={optimize}><input value={instruction} onChange={(event) => setInstruction(event.target.value)} disabled={isGenerating} maxLength={2000} placeholder="继续描述优化需求，生成新版本" /><button disabled={isGenerating || !instruction.trim()} aria-label="生成优化版本">↑</button></form></aside><section className="file-panel"><div className="panel-title">生成文件 <span>版本 {data?.version?.sequence ?? "—"}</span></div><div className="version-history"><div className="version-history-head"><b>版本历史</b>{selectedVersionId && <button onClick={() => void selectVersion(null)} disabled={isGenerating}>查看当前</button>}</div>{versions.length ? <div className="version-list">{versions.map((version) => <button className={data?.version?.id === version.id ? "version-active" : "version-item"} key={version.id} onClick={() => void selectVersion(version.id)} disabled={isGenerating}><span>v{version.sequence} · {version.appSpec.appName}</span>{data?.project.currentVersionId === version.id && <small>当前</small>}</button>)}</div> : <p className="panel-placeholder">生成后会保留每一次可恢复的版本。</p>}</div>{isHistoricalVersion && data?.version && <button className="restore-button" onClick={() => void restoreVersion(data.version!.id)} disabled={isGenerating}>恢复此版本为当前版本</button>}{isGenerating && !data?.files.length ? <p className="panel-placeholder">Agent 正在写入应用文件…</p> : data?.files.map((item) => <button className={selected?.path === item.path ? "file-active" : "file-item"} key={item.path} onClick={() => setFile(item.path)}>{item.path}</button>)}<pre>{selected?.contents ?? (isGenerating ? "生成完成后可查看源文件。" : "尚未生成文件。")}</pre></section><section className="viewer"><div className="panel-title"><span>应用查看器 {data?.version ? `· v${data.version.sequence}` : ""}</span><span>{data?.version?.appSpec.tagline ?? "等待生成应用"}</span></div>{previewError && <p className="task-error">{previewError}</p>}{isGenerating && !data?.version ? <div className="preview-loading"><span className="loading-orb" /><h3>正在构建应用预览</h3><p>Agent 将在完成验证后加载生成结果。</p></div> : <iframe ref={frameRef} className="app-preview" sandbox="allow-scripts" referrerPolicy="no-referrer" title="生成应用预览" srcDoc={document} />}</section></section></main>;
+  return <main className="workspace"><header className="workspace-head"><button className="quiet-button" onClick={back}>← 首页</button><b>{data?.version?.appSpec.appName ?? project.name}</b><span className={isGenerating ? "workspace-status workspace-status-working" : "workspace-status"}>{statusText}</span></header><section className="workspace-grid"><aside className="agent-panel"><p className="eyebrow">AGENT 执行过程</p><h3>{statusText}</h3>{data?.job?.logs.map((log, index) => { const phase = log.phase ?? log.stage ?? "activity"; const active = log.status === "active" || (isGenerating && index === (data.job?.logs.length ?? 0) - 1); const failed = log.status === "failed"; return <div className={`timeline ${active ? "timeline-active" : ""} ${failed ? "timeline-failed" : ""}`} key={`${phase}-${log.target ?? ""}-${index}`}><b>{failed ? "!" : active ? "•" : "✓"}</b><div><small>{phaseLabels[phase] ?? phase}{log.kind ? ` · ${eventKindLabels[log.kind] ?? log.kind}` : ""}</small><p>{displayTimelineMessage(log.message)}</p>{log.target && <span className="timeline-target">{displayTimelineTarget(log.target)}</span>}</div></div>; })}{isGenerating && !data?.job && <div className="timeline timeline-active"><b>•</b><div><small>等待执行</small><p>正在创建 Agent 任务…</p></div></div>}{data?.job?.status === "failed" && <button className="retry-button" onClick={() => void runGeneration()}>重新尝试生成</button>}<form className="composer" onSubmit={optimize}><input value={instruction} onChange={(event) => setInstruction(event.target.value)} disabled={isGenerating} maxLength={2000} placeholder="继续描述优化需求，生成新版本" /><button disabled={isGenerating || !instruction.trim()} aria-label="生成优化版本">↑</button></form></aside><section className="file-panel"><div className="panel-title">生成文件 <span>版本 {data?.version?.sequence ?? "—"}</span></div><div className="version-history"><div className="version-history-head"><b>版本历史</b>{selectedVersionId && <button onClick={() => void selectVersion(null)} disabled={isGenerating}>查看当前</button>}</div>{versions.length ? <div className="version-list">{versions.map((version) => <button className={data?.version?.id === version.id ? "version-active" : "version-item"} key={version.id} onClick={() => void selectVersion(version.id)} disabled={isGenerating}><span>v{version.sequence} · {version.appSpec.appName}</span>{data?.project.currentVersionId === version.id && <small>当前</small>}</button>)}</div> : <p className="panel-placeholder">生成后会保留每一次可恢复的版本。</p>}</div>{isHistoricalVersion && data?.version && <button className="restore-button" onClick={() => void restoreVersion(data.version!.id)} disabled={isGenerating}>恢复此版本为当前版本</button>}{isGenerating && !data?.files.length ? <p className="panel-placeholder">Agent 正在写入应用文件…</p> : <FileTree files={data?.files ?? []} selectedPath={selected?.path} onSelect={setFile} />}<pre className="source-view"><code>{selected?.contents ?? (isGenerating ? "生成完成后可查看源文件。" : "尚未生成文件。")}</code></pre></section><section className="viewer"><div className="panel-title"><span>应用查看器 {data?.version ? `· v${data.version.sequence}` : ""}</span><span>{data?.version?.appSpec.tagline ?? "等待生成应用"}</span></div>{previewError && <p className="task-error">{previewError}</p>}{isGenerating && !data?.version ? <div className="preview-loading"><span className="loading-orb" /><h3>正在构建应用预览</h3><p>Agent 将在完成验证后加载生成结果。</p></div> : <iframe ref={frameRef} className="app-preview" sandbox="allow-scripts" referrerPolicy="no-referrer" title="生成应用预览" srcDoc={document} />}</section></section></main>;
 }
