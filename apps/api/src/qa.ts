@@ -39,6 +39,8 @@ function runArtifactContractChecks() {
     ]
   };
   expect(generatedApplicationSchema.safeParse(multiFile).success, "A complete multi-file manifest artifact must parse.");
+  const inferredManifest = validateGeneratedApplication({ ...multiFile, manifest: {} });
+  expect(inferredManifest.manifest?.styles.length === 2 && inferredManifest.manifest.scripts.length === 3, "A complete multi-file artifact with an omitted manifest order must safely infer its local manifest.");
   expect(!generatedApplicationSchema.safeParse({ ...multiFile, manifest: { ...multiFile.manifest, styles: ["styles/tokens.css", "styles/missing.css"] } }).success, "A manifest must reference every generated stylesheet exactly once.");
   expect(!generatedApplicationSchema.safeParse({ ...multiFile, files: [...multiFile.files, { path: "assets/logo.svg", language: "md", contents: "not allowed" }] }).success, "Multi-file artifacts must reject paths outside the whitelist.");
   expect(generatedApplicationSchema.safeParse({ appSpec, files: [{ path: "index.html", language: "html", contents: "<main />" }, { path: "styles.css", language: "css", contents: "" }, { path: "app.js", language: "js", contents: "" }] }).success, "Legacy artifacts without a manifest must remain compatible.");
@@ -51,6 +53,8 @@ function runArtifactContractChecks() {
   };
   const blueprint = { complexityTarget: { minimumRegions: 5, minimumInteractions: 4, minimumDataEntities: 1, requiresResponsiveLayout: true } } as Parameters<typeof getQualityGaps>[1];
   expect(getQualityGaps(validateGeneratedApplication(qualityReady), blueprint).length === 0, "A complete quality-ready artifact must pass deterministic quality checks.");
+  const bridgedDemoState = { ...qualityReady, files: qualityReady.files.map((file) => file.path === "src/app.js" ? { ...file, contents: "const state=window.__BUILDFLOW_INITIAL_STATE__ || {trips:[{name:'West Lake'}]};const panel=document.createElement('div');panel.addEventListener('click',()=>{});panel.addEventListener('change',()=>{});panel.addEventListener('input',()=>{});panel.addEventListener('keydown',()=>{});panel.textContent=state.trips[0].name;" } : file) };
+  expect(getQualityGaps(validateGeneratedApplication(bridgedDemoState), blueprint).length === 0, "A non-empty preview bridge default must count as meaningful initial demo data.");
   expect(getQualityGaps(validateGeneratedApplication(multiFile), blueprint).length > 0, "A structurally valid but sparse artifact must fail deterministic quality checks.");
 }
 

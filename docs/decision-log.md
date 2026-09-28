@@ -43,3 +43,7 @@ New model-generated applications use a 7-12 file browser-only artifact with an e
 ## 2026-09-28: fail closed on module imports
 
 The generated-artifact validator explicitly rejects both dynamic imports and static imports with quoted module specifiers. The preview has no module loader and the product boundary forbids dependency/module resolution, so accepting `import './state.js'` would create a misleading or unsafe execution path. Multi-file scripts instead share the sandboxed iframe global scope in manifest order.
+
+## 2026-09-29: harmless multi-file response normalization
+
+When an otherwise complete 7–12 file artifact omits an empty or absent manifest object, the API derives CSS and JavaScript runtime order from its already allow-listed `styles/*.css` and `src/*.js` file order. It does not correct an explicitly invalid manifest, relax path limits, or modify executable content. The quality gate also recognizes a non-empty `window.__BUILDFLOW_INITIAL_STATE__ || {...}` default as first-screen demonstration data, matching the documented preview-state bridge.
