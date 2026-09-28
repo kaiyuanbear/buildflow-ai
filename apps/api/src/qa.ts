@@ -4,6 +4,7 @@ import { config } from "dotenv";
 import { buildApp } from "./app.js";
 import { getDatabase } from "./db/client.js";
 import { generationJobs } from "./db/schema.js";
+import { validateGeneratedApplication } from "./routes/generation.js";
 
 config({ path: "../../.env" });
 process.env.NODE_ENV = "test";
@@ -15,6 +16,11 @@ const app = buildApp();
 
 function expect(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
+}
+
+function expectThrows(action: () => unknown, message: string) {
+  try { action(); } catch { return; }
+  throw new Error(message);
 }
 
 function runArtifactContractChecks() {
@@ -36,6 +42,8 @@ function runArtifactContractChecks() {
   expect(!generatedApplicationSchema.safeParse({ ...multiFile, manifest: { ...multiFile.manifest, styles: ["styles/tokens.css", "styles/missing.css"] } }).success, "A manifest must reference every generated stylesheet exactly once.");
   expect(!generatedApplicationSchema.safeParse({ ...multiFile, files: [...multiFile.files, { path: "assets/logo.svg", language: "md", contents: "not allowed" }] }).success, "Multi-file artifacts must reject paths outside the whitelist.");
   expect(generatedApplicationSchema.safeParse({ appSpec, files: [{ path: "index.html", language: "html", contents: "<main />" }, { path: "styles.css", language: "css", contents: "" }, { path: "app.js", language: "js", contents: "" }] }).success, "Legacy artifacts without a manifest must remain compatible.");
+  expect(validateGeneratedApplication(multiFile).manifest?.scripts.at(-1) === "src/app.js", "The API validator must accept the complete manifest artifact.");
+  expectThrows(() => validateGeneratedApplication({ ...multiFile, files: multiFile.files.map((file) => file.path === "src/app.js" ? { ...file, contents: "import './state.js';" } : file) }), "The API validator must reject JavaScript imports.");
 }
 
 async function call<T>(session: Session, method: "GET" | "POST" | "PUT" | "DELETE", url: string, payload?: unknown): Promise<ApiResult<T>> {

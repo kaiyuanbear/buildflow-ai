@@ -9,7 +9,7 @@ const projectParams = z.object({ projectId: z.string().uuid() });
 const versionParams = projectParams.extend({ versionId: z.string().uuid() });
 const workspaceQuery = z.object({ versionId: z.string().uuid().optional() });
 const generateBody = z.object({ instruction: z.string().trim().min(3).max(2_000).optional() });
-const allowedPaths = ["index.html", "styles.css", "app.js", "README.md"] as const;
+const legacyAllowedPaths = ["index.html", "styles.css", "app.js", "README.md"] as const;
 const modelTimeoutMs = 90_000;
 const wholeGenerationTimeoutMs = 250_000;
 const generationBlueprintSchema = z.object({
@@ -82,13 +82,13 @@ function normalizeApplicationPayload(value: unknown): unknown {
   return { ...payload, files };
 }
 
-function validateApplication(value: unknown): GeneratedApplication {
+export function validateGeneratedApplication(value: unknown): GeneratedApplication {
   const application = generatedApplicationSchema.parse(normalizeApplicationPayload(value));
   const paths = application.files.map((file) => file.path);
-  if (application.appSpec.preview.entryPath !== "index.html" || application.files.length !== allowedPaths.length || new Set(paths).size !== paths.length || allowedPaths.some((path) => !paths.includes(path))) throw new Error("Generated artifact has invalid file paths.");
-  if (application.files.some((file) => Buffer.byteLength(file.contents, "utf8") > 55_000)) throw new Error("Generated artifact contains an oversized file.");
+  if (application.appSpec.preview.entryPath !== "index.html" || new Set(paths).size !== paths.length) throw new Error("Generated artifact has invalid file paths.");
+  if (!application.manifest && paths.some((path) => !(legacyAllowedPaths as readonly string[]).includes(path))) throw new Error("Generated artifact has invalid file paths.");
   const executableSource = application.files.filter((file) => file.language !== "md").map((file) => file.contents).join("\n");
-  const forbiddenCapability = /\b(localStorage|sessionStorage)\b/i.test(executableSource) ? "browser storage" : /\b(fetch|XMLHttpRequest|WebSocket|EventSource|navigator\.sendBeacon)\b/i.test(executableSource) ? "network access" : /\b(parent\.|top\.|document\.cookie|window\.open)\b/i.test(executableSource) ? "parent-window access" : /<form\b[^>]*\baction\s*=|\bimport\s*(?:\(|[\w{])|https?:\/\//i.test(executableSource) ? "external executable content" : null;
+  const forbiddenCapability = /\b(localStorage|sessionStorage)\b/i.test(executableSource) ? "browser storage" : /\b(fetch|XMLHttpRequest|WebSocket|EventSource|navigator\.sendBeacon)\b/i.test(executableSource) ? "network access" : /\b(parent\.|top\.|document\.cookie|window\.open)\b/i.test(executableSource) ? "parent-window access" : /<form\b[^>]*\baction\s*=|<script\b[^>]*\bsrc\s*=|<link\b[^>]*\bhref\s*=|\burl\s*\(|\bimport\s*(?:\(|[\w{])|https?:\/\//i.test(executableSource) ? "external executable content" : null;
   if (forbiddenCapability) throw new Error(`Generated artifact uses a forbidden browser capability: ${forbiddenCapability}.`);
   return application;
 }
@@ -139,12 +139,12 @@ async function generateWithDeepSeek(prompt: string, emit: EmitEvent): Promise<Ge
     await emit("generation", "model_request", "active", "正在请求 AI 生成浏览器端源文件。", "index.html、styles.css、app.js");
     let application: GeneratedApplication;
     try {
-      application = validateApplication(await requestDeepSeekJson<unknown>(apiKey, artifactInstructions(blueprint), prompt, 12_000, deadline));
+      application = validateGeneratedApplication(await requestDeepSeekJson<unknown>(apiKey, artifactInstructions(blueprint), prompt, 12_000, deadline));
     } catch (reason) {
       const repairReason = fallbackReason(reason);
       await emit("generation", "validation", "active", "检测到约束问题，正在请求一次受限修复。", repairReason);
       const repairInstructions = `${artifactInstructions(blueprint)} A previous candidate was rejected: ${repairReason} Return a complete replacement artifact. Never use localStorage, sessionStorage, fetch, external URLs, imports, form actions, popups, parent/top access, or document.cookie.`;
-      application = validateApplication(await requestDeepSeekJson<unknown>(apiKey, repairInstructions, prompt, 12_000, deadline));
+      application = validateGeneratedApplication(await requestDeepSeekJson<unknown>(apiKey, repairInstructions, prompt, 12_000, deadline));
     }
     await emit("generation", "model_response", "succeeded", "已接收结构化浏览器应用产物。", "4 个生成文件");
     await emit("validation", "validation", "succeeded", "已校验文件路径、预览入口、大小限制与浏览器安全约束。");

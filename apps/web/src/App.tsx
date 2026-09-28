@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { buildPreviewDocument } from "./preview";
 
 type User = { id: string; email: string };
 type Project = { id: string; name: string; prompt: string; updatedAt: string };
@@ -58,21 +59,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 function projectIdFromPath() {
   return window.location.pathname.match(/^\/projects\/([\w-]+)$/)?.[1] ?? null;
-}
-
-function escapeForInlineScript(value: unknown) {
-  return JSON.stringify(value).replace(/</g, "\\u003c");
-}
-
-function buildPreviewDocument(files: GeneratedFile[], previewState: Record<string, unknown>) {
-  const entry = files.find((file) => file.path === "index.html")?.contents ?? "<main><h1>Preview unavailable</h1><p>index.html was not generated.</p></main>";
-  const styles = files.filter((file) => file.language === "css").map((file) => file.contents.replace(/<\/style/gi, "<\\/style")).join("\n");
-  const scripts = files.filter((file) => file.language === "js").map((file) => file.contents.replace(/<\/script/gi, "<\\/script")).join("\n");
-  const bridge = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
-<style>${styles}</style><script>window.__BUILDFLOW_INITIAL_STATE__=${escapeForInlineScript(previewState)};window.__BUILDFLOW_SAVE_STATE__=function(state){window.parent.postMessage({source:'buildflow-preview',type:'save-state',state:state},'*')};</script>`;
-  const appScript = `<script>${scripts}</script>`;
-  if (/<\/head>/i.test(entry)) return entry.replace(/<\/head>/i, `${bridge}</head>`).replace(/<\/body>/i, `${appScript}</body>`);
-  return `<!doctype html><html><head><meta charset="utf-8">${bridge}</head><body>${entry}${appScript}</body></html>`;
 }
 
 export function App() {
@@ -176,7 +162,7 @@ function Builder({ project, back, startGeneration, onGenerationStarted }: { proj
   }
 
   const selected = data?.files.find((item) => item.path === file) ?? data?.files[0];
-  const document = useMemo(() => buildPreviewDocument(data?.files ?? [], data?.previewState ?? {}), [data?.files, data?.previewState]);
+  const document = useMemo(() => buildPreviewDocument(data?.files ?? [], data?.previewState ?? {}, data?.version?.appSpec.artifactManifest), [data?.files, data?.previewState, data?.version?.appSpec.artifactManifest]);
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       const payload = event.data as { source?: string; type?: string; state?: unknown };
