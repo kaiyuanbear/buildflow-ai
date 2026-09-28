@@ -59,3 +59,5 @@
 ## Latest regression evidence
 
 - [x] TodoList prompt regression request reached the local API after safe artifact normalization; temporary project cleanup ran on 2026-09-28. API and Web TypeScript checks pass. (The local API QA script could not be launched afterward because the Windows host reported `ENOMEM` while another development process was active; manual browser verification remains required.)
+- [x] Multi-file artifact contract accepts a complete 7-file manifest artifact, rejects missing manifest references and non-whitelisted paths, and continues to accept the legacy three-file artifact shape. Verified directly against the rebuilt contracts package on 2026-09-28.
+- [x] Milestone 1 type checks pass across contracts, API, and Web on 2026-09-28. The broader `tsx` API QA remains blocked by the host-level `uv_os_get_passwd ENOMEM` error; it is unrelated to contract parsing and will be retried in milestone 5.

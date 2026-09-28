@@ -15,12 +15,45 @@ export type GenerationEventStatus = z.infer<typeof generationEventStatusSchema>;
 export const generationStatusSchema = z.enum(["idle", "queued", "running", "completed", "failed"]);
 export type GenerationStatus = z.infer<typeof generationStatusSchema>;
 
+export const generatedFileLanguages = ["html", "css", "js", "tsx", "ts", "json", "md"] as const;
+export const generatedFileLanguageSchema = z.enum(generatedFileLanguages);
+export const legacyGeneratedFilePaths = ["index.html", "styles.css", "app.js", "README.md"] as const;
+export const generatedArtifactLimits = {
+  legacyMinFiles: 3,
+  legacyMaxFiles: 6,
+  multiFileMinFiles: 7,
+  multiFileMaxFiles: 12,
+  maxFileBytes: 40_000,
+  maxTotalBytes: 180_000
+} as const;
+
+export function isAllowedMultiFilePath(path: string) {
+  return path === "index.html" || path === "README.md" || /^styles\/[a-zA-Z0-9_-]+\.css$/.test(path) || /^src\/[a-zA-Z0-9_-]+\.js$/.test(path);
+}
+
 export const generatedFileSchema = z.object({
   path: z.string().regex(/^[a-zA-Z0-9_./-]+$/).min(1).max(255),
-  language: z.enum(["html", "css", "js", "tsx", "ts", "json", "md"]),
-  contents: z.string().max(60_000)
+  language: generatedFileLanguageSchema,
+  contents: z.string().max(generatedArtifactLimits.maxFileBytes)
 });
 export type GeneratedFile = z.infer<typeof generatedFileSchema>;
+
+export const generatedArtifactManifestSchema = z.object({
+  styles: z.array(z.string().regex(/^styles\/[a-zA-Z0-9_-]+\.css$/)).min(2).max(4),
+  scripts: z.array(z.string().regex(/^src\/[a-zA-Z0-9_-]+\.js$/)).min(3).max(7)
+}).strict().superRefine((manifest, context) => {
+  if (new Set(manifest.styles).size !== manifest.styles.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ["styles"], message: "Manifest styles must not contain duplicates." });
+  if (new Set(manifest.scripts).size !== manifest.scripts.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ["scripts"], message: "Manifest scripts must not contain duplicates." });
+});
+export type GeneratedArtifactManifest = z.infer<typeof generatedArtifactManifestSchema>;
+
+export const complexityTargetSchema = z.object({
+  minimumRegions: z.number().int().min(5).max(8),
+  minimumInteractions: z.number().int().min(4).max(8),
+  minimumDataEntities: z.number().int().min(1).max(3),
+  requiresResponsiveLayout: z.literal(true)
+}).strict();
+export type ComplexityTarget = z.infer<typeof complexityTargetSchema>;
 
 export const generationPlanStepSchema = z.object({
   stage: generationStageSchema,
@@ -55,10 +88,32 @@ export const appSpecSchema = z.object({
 });
 export type AppSpec = z.infer<typeof appSpecSchema>;
 
+export const storedAppSpecSchema = appSpecSchema.extend({
+  artifactManifest: generatedArtifactManifestSchema.optional()
+});
+export type StoredAppSpec = z.infer<typeof storedAppSpecSchema>;
+
 export const generatedApplicationSchema = z.object({
   appSpec: appSpecSchema,
-  files: z.array(generatedFileSchema).min(3).max(6)
-    .refine((files) => files.some((file) => file.path === "index.html"), "index.html is required")
+  manifest: generatedArtifactManifestSchema.optional(),
+  files: z.array(generatedFileSchema).min(generatedArtifactLimits.legacyMinFiles).max(generatedArtifactLimits.multiFileMaxFiles)
+}).superRefine((application, context) => {
+  const paths = application.files.map((file) => file.path);
+  const totalBytes = application.files.reduce((total, file) => total + new TextEncoder().encode(file.contents).byteLength, 0);
+  if (!paths.includes("index.html")) context.addIssue({ code: z.ZodIssueCode.custom, path: ["files"], message: "index.html is required." });
+  if (new Set(paths).size !== paths.length) context.addIssue({ code: z.ZodIssueCode.custom, path: ["files"], message: "Generated file paths must be unique." });
+  if (totalBytes > generatedArtifactLimits.maxTotalBytes) context.addIssue({ code: z.ZodIssueCode.custom, path: ["files"], message: "Generated files exceed the total size limit." });
+  if (!application.manifest) {
+    if (application.files.length > generatedArtifactLimits.legacyMaxFiles) context.addIssue({ code: z.ZodIssueCode.custom, path: ["files"], message: "Legacy artifacts may contain at most six files." });
+    for (const file of application.files) if (!(legacyGeneratedFilePaths as readonly string[]).includes(file.path)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["files"], message: `Unsupported legacy file path: ${file.path}` });
+    return;
+  }
+  if (application.files.length < generatedArtifactLimits.multiFileMinFiles) context.addIssue({ code: z.ZodIssueCode.custom, path: ["files"], message: "Multi-file artifacts require at least seven files." });
+  for (const file of application.files) if (!isAllowedMultiFilePath(file.path)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["files"], message: `Unsupported multi-file path: ${file.path}` });
+  const styles = application.files.filter((file) => file.language === "css").map((file) => file.path);
+  const scripts = application.files.filter((file) => file.language === "js").map((file) => file.path);
+  if (styles.length !== application.manifest.styles.length || application.manifest.styles.some((path) => !styles.includes(path))) context.addIssue({ code: z.ZodIssueCode.custom, path: ["manifest", "styles"], message: "Manifest must reference every generated CSS file exactly once." });
+  if (scripts.length !== application.manifest.scripts.length || application.manifest.scripts.some((path) => !scripts.includes(path))) context.addIssue({ code: z.ZodIssueCode.custom, path: ["manifest", "scripts"], message: "Manifest must reference every generated JavaScript file exactly once." });
 });
 export type GeneratedApplication = z.infer<typeof generatedApplicationSchema>;
 

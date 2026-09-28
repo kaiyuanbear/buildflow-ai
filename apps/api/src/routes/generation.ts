@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import type { FastifyPluginAsync } from "fastify";
-import { generatedApplicationSchema, previewStateSchema, type GeneratedApplication, type GenerationEvent, type GenerationEventKind, type GenerationEventPhase, type GenerationEventStatus, type GenerationLogEntry } from "@buildflow/contracts";
+import { complexityTargetSchema, generatedApplicationSchema, previewStateSchema, type GeneratedApplication, type GenerationEvent, type GenerationEventKind, type GenerationEventPhase, type GenerationEventStatus, type GenerationLogEntry } from "@buildflow/contracts";
 import { z } from "zod";
 import { getDatabase } from "../db/client.js";
 import { generatedFiles, generationJobs, projects, projectPreviewStates, projectVersions } from "../db/schema.js";
@@ -19,7 +19,8 @@ const generationBlueprintSchema = z.object({
   regions: z.array(z.object({ name: z.string().min(2).max(60), purpose: z.string().min(6).max(160) })).min(3).max(6).catch([{ name: "Overview", purpose: "Summarize the current state and important information." }, { name: "Workspace", purpose: "Provide the primary interactive controls and content." }, { name: "Insights", purpose: "Show useful secondary details and progress." }]),
   dataEntities: z.array(z.object({ name: z.string().min(2).max(60), fields: z.array(z.string().min(1).max(50)).min(1).max(6) })).min(1).max(3).catch([{ name: "Item", fields: ["title", "status", "note"] }]),
   interactions: z.array(z.string().min(6).max(180)).min(3).max(6).catch(["Create and update local items.", "Filter or search the displayed content.", "Show a summary that reacts to local changes."]),
-  acceptanceChecks: z.array(z.string().min(6).max(180)).min(3).max(6).catch(["The application has three visible regions.", "Local interactions update the rendered UI.", "The layout remains usable on narrow screens."])
+  acceptanceChecks: z.array(z.string().min(6).max(180)).min(3).max(6).catch(["The application has three visible regions.", "Local interactions update the rendered UI.", "The layout remains usable on narrow screens."]),
+  complexityTarget: complexityTargetSchema.catch({ minimumRegions: 5, minimumInteractions: 4, minimumDataEntities: 1, requiresResponsiveLayout: true })
 }).passthrough();
 type GenerationBlueprint = z.infer<typeof generationBlueprintSchema>;
 type EmitEvent = (phase: GenerationEventPhase, kind: GenerationEventKind, status: GenerationEventStatus, message: string, target?: string) => Promise<void>;

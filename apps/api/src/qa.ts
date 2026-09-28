@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { generatedApplicationSchema } from "@buildflow/contracts";
 import { config } from "dotenv";
 import { buildApp } from "./app.js";
 import { getDatabase } from "./db/client.js";
@@ -14,6 +15,27 @@ const app = buildApp();
 
 function expect(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
+}
+
+function runArtifactContractChecks() {
+  const appSpec = { appName: "Contract QA", tagline: "Validate the multi-file artifact contract.", features: ["Manifest", "Compatibility"], preview: { entryPath: "index.html" } };
+  const multiFile = {
+    appSpec,
+    manifest: { styles: ["styles/tokens.css", "styles/layout.css"], scripts: ["src/state.js", "src/ui.js", "src/app.js"] },
+    files: [
+      { path: "index.html", language: "html", contents: "<main>Contract QA</main>" },
+      { path: "README.md", language: "md", contents: "# Contract QA" },
+      { path: "styles/tokens.css", language: "css", contents: ":root{color:#111}" },
+      { path: "styles/layout.css", language: "css", contents: "main{display:grid}" },
+      { path: "src/state.js", language: "js", contents: "const state={};" },
+      { path: "src/ui.js", language: "js", contents: "function render(){}" },
+      { path: "src/app.js", language: "js", contents: "render();" }
+    ]
+  };
+  expect(generatedApplicationSchema.safeParse(multiFile).success, "A complete multi-file manifest artifact must parse.");
+  expect(!generatedApplicationSchema.safeParse({ ...multiFile, manifest: { ...multiFile.manifest, styles: ["styles/tokens.css", "styles/missing.css"] } }).success, "A manifest must reference every generated stylesheet exactly once.");
+  expect(!generatedApplicationSchema.safeParse({ ...multiFile, files: [...multiFile.files, { path: "assets/logo.svg", language: "md", contents: "not allowed" }] }).success, "Multi-file artifacts must reject paths outside the whitelist.");
+  expect(generatedApplicationSchema.safeParse({ appSpec, files: [{ path: "index.html", language: "html", contents: "<main />" }, { path: "styles.css", language: "css", contents: "" }, { path: "app.js", language: "js", contents: "" }] }).success, "Legacy artifacts without a manifest must remain compatible.");
 }
 
 async function call<T>(session: Session, method: "GET" | "POST" | "PUT" | "DELETE", url: string, payload?: unknown): Promise<ApiResult<T>> {
@@ -37,6 +59,8 @@ async function main() {
   let projectId: string | undefined;
 
   try {
+    console.log("QA: multi-file artifact contract checks");
+    runArtifactContractChecks();
     console.log("QA: auth checks");
     expect((await call<{ code: string }>({}, "GET", "/api/projects")).statusCode === 401, "Unauthenticated project reads must return 401.");
 

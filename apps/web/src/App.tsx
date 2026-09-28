@@ -6,7 +6,7 @@ type Mode = "login" | "register";
 type HomeTab = "discover" | "projects" | "templates";
 type ShowcaseItem = { title: string; description: string; eyebrow: string; tone: string };
 type GeneratedFile = { path: string; language: string; contents: string };
-type VersionSummary = { id: string; sequence: string; summary: string; createdAt: string; appSpec: { appName: string; tagline: string; features: string[] } };
+type VersionSummary = { id: string; sequence: string; summary: string; createdAt: string; appSpec: { appName: string; tagline: string; features: string[]; artifactManifest?: { styles: string[]; scripts: string[] } } };
 type GenerationLog = { message: string; createdAt?: string; stage?: string; phase?: string; kind?: string; status?: "pending" | "active" | "succeeded" | "failed" | "skipped"; target?: string };
 type Workspace = {
   project: { currentVersionId: string | null };
