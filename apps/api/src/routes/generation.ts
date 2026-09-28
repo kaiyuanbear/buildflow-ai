@@ -236,7 +236,21 @@ export const registerGenerationRoutes: FastifyPluginAsync = async (app) => {
     if (versionId && !version) return reply.code(404).send({ code: "VERSION_NOT_FOUND" });
     const files = version ? await db.select().from(generatedFiles).where(eq(generatedFiles.versionId, version.id)) : [];
     const [previewState] = version ? await db.select().from(projectPreviewStates).where(and(eq(projectPreviewStates.projectId, projectId), eq(projectPreviewStates.versionId, version.id))) : [];
-    return { project, job: jobs.at(-1) ?? null, version, files, previewState: previewState?.state ?? {} };
+    const promptLogs = versions
+      .slice()
+      .sort((left, right) => Number(left.sequence) - Number(right.sequence))
+      .flatMap((item) => {
+        const request = (item.appSpec as { generationRequest?: { prompt: string; instruction?: string } }).generationRequest;
+        // Versions created before request history existed only have the original project prompt.
+        if (!request && item.sequence !== "1") return [];
+        const prompt = request?.instruction ?? request?.prompt ?? project.prompt;
+        const label = request?.instruction ? `v${item.sequence} · 优化需求` : `v${item.sequence} · 初始需求`;
+        const target = `${label}：${prompt.length > 220 ? `${prompt.slice(0, 220)}…` : prompt}`;
+        return [eventAt("analysis", "status", "succeeded", "已记录用户需求。", target)];
+      });
+    const latestJob = jobs.at(-1) ?? null;
+    const job = latestJob ? { ...latestJob, logs: [...promptLogs, ...latestJob.logs] } : null;
+    return { project, job, version, files, previewState: previewState?.state ?? {} };
   });
 
   app.get("/:projectId/versions", async (request, reply) => {
@@ -309,7 +323,11 @@ export const registerGenerationRoutes: FastifyPluginAsync = async (app) => {
       const application = result.application;
       if (result.usedFallback) await emit("generation", "status", "skipped", `已使用本地可交互起步应用。${result.fallbackMessage ?? "AI 暂时不可用。"}`);
       const versions = await db.select({ id: projectVersions.id }).from(projectVersions).where(eq(projectVersions.projectId, projectId));
-      const appSpec = application.manifest ? { ...application.appSpec, artifactManifest: application.manifest } : application.appSpec;
+      const appSpec = {
+        ...application.appSpec,
+        ...(application.manifest ? { artifactManifest: application.manifest } : {}),
+        generationRequest: { prompt: project.prompt, ...(instruction ? { instruction } : {}) }
+      };
       const [version] = await db.insert(projectVersions).values({ projectId, sequence: String(versions.length + 1), appSpec, summary: application.appSpec.tagline }).returning();
       if (!version) throw new Error("Could not create project version");
       await emit("persistence", "version_save", "succeeded", "已为通过校验的产物创建不可变版本。", `v${version.sequence}`);

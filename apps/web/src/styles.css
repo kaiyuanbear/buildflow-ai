@@ -64,6 +64,8 @@ input:focus { border-color: #8b7cff; box-shadow: 0 0 0 3px rgba(139,124,255,.18)
 @media (min-width: 761px) {
   .sidebar { position: sticky; top: 0; align-self: start; height: 100vh; overflow: hidden; }
 }
+.recent-projects { display: grid; flex: 1 1 auto; min-height: 0; gap: 2px; overflow-y: auto; overscroll-behavior: contain; padding: 0 2px; }
+.sidebar .signout { margin-top: 0; }
 .discover { margin-top: 150px; }
 .discover-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .home-tabs { display: flex; flex-wrap: wrap; gap: 8px; }

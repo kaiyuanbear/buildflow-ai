@@ -22,6 +22,7 @@
 - [x] Regeneration creates a later version, and version history returns both versions in descending order. (Temporary API QA created v1 and v2, verified on 2026-09-28.)
 - [x] A historical workspace can be loaded with its version ID, and the restore API accepts a project-owned earlier version. (Temporary API QA read v1 after v2 and restored v1 on 2026-09-28.)
 - [x] Version restore updates the active version after a fresh default-workspace read. (Browser QA restored v1 and refreshed the workspace on 2026-09-28.)
+- [ ] New versions persist their original/optimization requests, and workspace Agent logs expose that history in version order. (Production build passed on 2026-09-29; full API QA is pending because the real-model run exceeds the current command channel limit.)
 - [x] Project task data is isolated by project, accepts creation and completion updates, and persists after a fresh read. (Temporary API QA project verified and deleted on 2026-09-27.)
 
 ## Browser journey

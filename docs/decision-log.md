@@ -36,6 +36,10 @@ BuildFlow AI records structured server-side execution events rather than exposin
 
 Before strict validation, BuildFlow AI only normalizes harmless response-shape differences that do not change executable content: common canonical file aliases, canonical language labels, and a missing non-executable README. The resulting artifact must still contain exactly the four allow-listed files and pass the existing size and browser-capability checks. This improves model compatibility without weakening the sandbox contract.
 
+## 2026-09-29: version-scoped request history
+
+Each newly generated version stores its original project prompt and, when present, its optimization instruction inside the existing version `appSpec` JSON. The Builder turns that persisted history into truthful timeline entries in version order. No schema migration is required; historical versions created before this decision retain only the initial project prompt rather than inventing unavailable optimization text.
+
 ## 2026-09-28: manifest-driven quality artifacts
 
 New model-generated applications use a 7-12 file browser-only artifact with an explicit manifest: CSS files live under `styles/`, JavaScript files live under `src/`, and `index.html` remains markup-only. The preview assembles those files deterministically inside its sandbox. The API permits one bounded repair, then checks minimum semantic regions, local interactions, initial data, visible state feedback, and a narrow-screen media query before it persists a version. Legacy four-file artifacts remain readable for older projects.

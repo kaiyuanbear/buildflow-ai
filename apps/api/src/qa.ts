@@ -112,8 +112,9 @@ async function main() {
     await db.delete(generationJobs).where(and(eq(generationJobs.projectId, projectId), eq(generationJobs.status, "running")));
 
     console.log("QA: generation and preview-state checks");
-    const first = await call<{ job: { logs: Array<{ phase?: string; kind?: string; target?: string }> }; version: { id: string; sequence: string }; files: Array<{ path: string }> }>(owner, "POST", `/api/projects/${projectId}/generate`, {});
+    const first = await call<{ job: { logs: Array<{ phase?: string; kind?: string; target?: string }> }; version: { id: string; sequence: string; appSpec: { generationRequest?: { prompt: string; instruction?: string } } }; files: Array<{ path: string }> }>(owner, "POST", `/api/projects/${projectId}/generate`, {});
     expect(first.statusCode === 201 && first.body.version.sequence === "1" && first.body.files.some((file) => file.path === "index.html"), "First generation must save version 1 and files.");
+    expect(first.body.version.appSpec.generationRequest?.prompt === "Create a small reading tracker with a list and progress controls." && !first.body.version.appSpec.generationRequest.instruction, "The first version must persist its original product prompt.");
     expect(first.body.job.logs.length >= 8 && first.body.job.logs.some((log) => log.kind === "file_write" && log.target === "app.js") && first.body.job.logs.some((log) => log.kind === "preview_ready"), "Generation must persist truthful file-write and preview-ready events.");
     expect((await call<{ code: string }>(guest, "PUT", `/api/projects/${projectId}/versions/${first.body.version.id}/preview-state`, { saved: true })).statusCode === 404, "A second user must not write preview state.");
     expect((await call(owner, "PUT", `/api/projects/${projectId}/versions/${first.body.version.id}/preview-state`, { saved: true, count: 1 })).statusCode === 200, "Preview state must save.");
@@ -121,10 +122,13 @@ async function main() {
     expect(firstWorkspace.statusCode === 200 && firstWorkspace.body.version.id === first.body.version.id && firstWorkspace.body.previewState.saved === true && firstWorkspace.body.previewState.count === 1, "Preview state must persist on a fresh workspace read.");
 
     console.log("QA: version-history and restore checks");
-    const second = await call<{ version: { id: string; sequence: string } }>(owner, "POST", `/api/projects/${projectId}/generate`, { instruction: "Make the layout denser and add a weekly progress summary." });
+    const second = await call<{ version: { id: string; sequence: string; appSpec: { generationRequest?: { prompt: string; instruction?: string } } } }>(owner, "POST", `/api/projects/${projectId}/generate`, { instruction: "Make the layout denser and add a weekly progress summary." });
     expect(second.statusCode === 201 && second.body.version.sequence === "2", "Optimization must create version 2.");
+    expect(second.body.version.appSpec.generationRequest?.instruction === "Make the layout denser and add a weekly progress summary.", "An optimized version must persist its optimization prompt.");
     const history = await call<{ versions: Array<{ id: string; sequence: string }> }>(owner, "GET", `/api/projects/${projectId}/versions`);
     expect(history.statusCode === 200 && history.body.versions.length === 2 && history.body.versions[0]?.id === second.body.version.id, "Version history must include both versions in descending order.");
+    const promptWorkspace = await call<{ job: { logs: Array<{ target?: string }> } }>(owner, "GET", `/api/projects/${projectId}/workspace`);
+    expect(promptWorkspace.statusCode === 200 && promptWorkspace.body.job.logs.some((log) => log.target?.includes("v1 · 初始需求")) && promptWorkspace.body.job.logs.some((log) => log.target?.includes("v2 · 优化需求")), "Workspace logs must expose the persisted prompt history in version order.");
     const historical = await call<{ version: { id: string; sequence: string } }>(owner, "GET", `/api/projects/${projectId}/workspace?versionId=${first.body.version.id}`);
     expect(historical.statusCode === 200 && historical.body.version.id === first.body.version.id, "Historical workspace reads must return the requested version.");
     expect((await call(owner, "POST", `/api/projects/${projectId}/versions/${first.body.version.id}/restore`, {})).statusCode === 200, "Restore must succeed.");

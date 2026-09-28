@@ -89,7 +89,11 @@ export const appSpecSchema = z.object({
 export type AppSpec = z.infer<typeof appSpecSchema>;
 
 export const storedAppSpecSchema = appSpecSchema.extend({
-  artifactManifest: generatedArtifactManifestSchema.optional()
+  artifactManifest: generatedArtifactManifestSchema.optional(),
+  generationRequest: z.object({
+    prompt: z.string().min(3).max(2_000),
+    instruction: z.string().min(3).max(2_000).optional()
+  }).optional()
 });
 export type StoredAppSpec = z.infer<typeof storedAppSpecSchema>;
 

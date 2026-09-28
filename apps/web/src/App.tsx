@@ -7,7 +7,7 @@ type Mode = "login" | "register";
 type HomeTab = "discover" | "projects" | "templates";
 type ShowcaseItem = { title: string; description: string; eyebrow: string; tone: string };
 type GeneratedFile = { path: string; language: string; contents: string };
-type VersionSummary = { id: string; sequence: string; summary: string; createdAt: string; appSpec: { appName: string; tagline: string; features: string[]; artifactManifest?: { styles: string[]; scripts: string[] } } };
+type VersionSummary = { id: string; sequence: string; summary: string; createdAt: string; appSpec: { appName: string; tagline: string; features: string[]; artifactManifest?: { styles: string[]; scripts: string[] }; generationRequest?: { prompt: string; instruction?: string } } };
 type GenerationLog = { message: string; createdAt?: string; stage?: string; phase?: string; kind?: string; status?: "pending" | "active" | "succeeded" | "failed" | "skipped"; target?: string };
 type Workspace = {
   project: { currentVersionId: string | null };
@@ -106,13 +106,72 @@ export function App() {
   return activeProject ? <Builder project={activeProject} startGeneration={generationRequestedFor === activeProject.id} onGenerationStarted={() => setGenerationRequestedFor(null)} back={() => { window.history.pushState({}, "", "/"); setActiveProjectId(null); setActiveProject(null); setGenerationRequestedFor(null); }} /> : <Home user={user} onProjectReady={openProject} logout={async () => { await request<void>("/api/auth/logout", { method: "POST", body: "{}" }); setUser(null); }} />;
 }
 
-function Home({ user, logout, onProjectReady }: { user: User; logout: () => Promise<void>; onProjectReady: (project: Project, startGeneration?: boolean) => void }) {
+function LegacyHome({ user, logout, onProjectReady }: { user: User; logout: () => Promise<void>; onProjectReady: (project: Project, startGeneration?: boolean) => void }) {
   const [projects, setProjects] = useState<Project[]>([]); const [prompt, setPrompt] = useState(""); const [error, setError] = useState<string | null>(null); const [saving, setSaving] = useState(false); const [activeTab, setActiveTab] = useState<HomeTab>("discover"); const galleryRef = useRef<HTMLElement>(null);
   const load = () => request<{ projects: Project[] }>("/api/projects").then((data) => setProjects(data.projects)); useEffect(() => { load().catch(() => setError("项目加载失败")); }, []);
   async function create(event: FormEvent) { event.preventDefault(); setSaving(true); setError(null); try { const name = prompt.length > 26 ? `${prompt.slice(0, 26)}…` : prompt; const data = await request<{ project: Project }>("/api/projects", { method: "POST", body: JSON.stringify({ name, prompt }) }); setPrompt(""); onProjectReady(data.project, true); } catch (reason) { setError(reason instanceof Error ? reason.message : "创建项目失败"); } finally { setSaving(false); } }
   function selectTab(tab: HomeTab) { setActiveTab(tab); window.requestAnimationFrame(() => galleryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })); }
   const samples = activeTab === "discover" ? discoverSamples : templateSamples;
   return <main className="atoms-shell"><aside className="sidebar"><div className="brand">◉ <b>BuildFlow AI</b></div><div className="account">{user.email}</div><nav><button type="button" className={activeTab === "discover" ? "nav-active" : ""} onClick={() => selectTab("discover")}>⌂ 首页</button><button type="button" className={activeTab === "templates" ? "nav-active" : ""} onClick={() => selectTab("templates")}>◌ 资源</button><button type="button" className={activeTab === "projects" ? "nav-active" : ""} onClick={() => selectTab("projects")}>▣ 我的项目</button></nav><p className="nav-caption">最近</p>{projects.slice(0, 5).map((project) => <button className="recent" key={project.id} onClick={() => onProjectReady(project)}>◌ {project.name}</button>)}<button className="signout" onClick={logout}>退出登录</button></aside><section className="atoms-home"><p className="notice">BuildFlow AI · 让智能体团队实现你的想法</p><h1>输入想法，产出产品。</h1><p className="home-subtitle">开始吧，{user.email.split("@")[0]}。</p><form className="prompt-box" onSubmit={create}><textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="例如：为我制作一个简单的简历生成应用" minLength={10} required /><footer><span>✦ AI 生成浏览器应用</span><button className="send-button" disabled={saving}>{saving ? "构建中…" : "↑ 开始构建"}</button></footer></form>{error && <p className="form-error" role="alert">{error}</p>}<section className="discover" ref={galleryRef}><div className="discover-head"><div className="home-tabs"><button type="button" className={activeTab === "discover" ? "home-tab-active" : ""} onClick={() => selectTab("discover")}>发现</button><button type="button" className={activeTab === "projects" ? "home-tab-active" : ""} onClick={() => selectTab("projects")}>我的项目</button><button type="button" className={activeTab === "templates" ? "home-tab-active" : ""} onClick={() => selectTab("templates")}>模板</button></div><span className="gallery-hint">{activeTab === "projects" ? "已生成的应用" : "示例展示"}</span></div>{activeTab === "projects" ? <div className="showcase-grid project-showcase-grid">{projects.length ? projects.map((project, index) => <button type="button" className={`project-showcase tone-${["ink", "sky", "plum", "meadow"][index % 4]}`} key={project.id} onClick={() => onProjectReady(project)}><div className="showcase-thumb"><span>GENERATED APP</span><strong>{project.name}</strong><p>{project.prompt}</p></div><footer><b>{project.name}</b><span>{new Date(project.updatedAt).toLocaleDateString("zh-CN")}</span></footer></button>) : <p className="gallery-empty">还没有生成项目。输入上方的想法后，第一个应用会显示在这里。</p>}</div> : <div className="showcase-grid">{samples.map((sample) => <article className="showcase-card" key={sample.title}><div className={`showcase-thumb tone-${sample.tone}`}><span>{sample.eyebrow}</span><strong>{sample.title}</strong><p>{sample.description}</p></div><footer><b>{sample.title}</b><span>{sample.description}</span></footer></article>)}</div>}</section></section></main>;
+}
+
+function Home({ user, logout, onProjectReady }: { user: User; logout: () => Promise<void>; onProjectReady: (project: Project, startGeneration?: boolean) => void }) {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [prompt, setPrompt] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<HomeTab>("discover");
+  const galleryRef = useRef<HTMLElement>(null);
+  const load = () => request<{ projects: Project[] }>("/api/projects").then((data) => setProjects(data.projects));
+
+  useEffect(() => { load().catch(() => setError("项目加载失败")); }, []);
+  async function create(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      const name = prompt.length > 26 ? `${prompt.slice(0, 26)}…` : prompt;
+      const data = await request<{ project: Project }>("/api/projects", { method: "POST", body: JSON.stringify({ name, prompt }) });
+      setPrompt("");
+      onProjectReady(data.project, true);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "创建项目失败"); } finally { setSaving(false); }
+  }
+  function selectTab(tab: HomeTab) {
+    setActiveTab(tab);
+    window.requestAnimationFrame(() => galleryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+  const samples = activeTab === "discover" ? discoverSamples : templateSamples;
+
+  return <main className="atoms-shell">
+    <aside className="sidebar">
+      <div className="brand">◉ <b>BuildFlow AI</b></div>
+      <div className="account">{user.email}</div>
+      <nav>
+        <button type="button" className={activeTab === "discover" ? "nav-active" : ""} onClick={() => selectTab("discover")}>⌂ 首页</button>
+        <button type="button" className={activeTab === "templates" ? "nav-active" : ""} onClick={() => selectTab("templates")}>◌ 资源</button>
+        <button type="button" className={activeTab === "projects" ? "nav-active" : ""} onClick={() => selectTab("projects")}>▣ 我的项目</button>
+      </nav>
+      <p className="nav-caption">最近</p>
+      <div className="recent-projects" aria-label="最近项目">
+        {projects.map((project) => <button className="recent" key={project.id} onClick={() => onProjectReady(project)}>◌ {project.name}</button>)}
+      </div>
+      <button className="signout" onClick={logout}>退出登录</button>
+    </aside>
+    <section className="atoms-home">
+      <p className="notice">BuildFlow AI · 让智能体团队实现你的想法</p>
+      <h1>输入想法，产出产品。</h1>
+      <p className="home-subtitle">开始吧，{user.email.split("@")[0]}。</p>
+      <form className="prompt-box" onSubmit={create}>
+        <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="例如：为我制作一个简单的简历生成应用" minLength={10} required />
+        <footer><span>✦ AI 生成浏览器应用</span><button className="send-button" disabled={saving}>{saving ? "构建中…" : "↑ 开始构建"}</button></footer>
+      </form>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <section className="discover" ref={galleryRef}>
+        <div className="discover-head"><div className="home-tabs"><button type="button" className={activeTab === "discover" ? "home-tab-active" : ""} onClick={() => selectTab("discover")}>发现</button><button type="button" className={activeTab === "projects" ? "home-tab-active" : ""} onClick={() => selectTab("projects")}>我的项目</button><button type="button" className={activeTab === "templates" ? "home-tab-active" : ""} onClick={() => selectTab("templates")}>模板</button></div><span className="gallery-hint">{activeTab === "projects" ? "已生成的应用" : "示例展示"}</span></div>
+        {activeTab === "projects" ? <div className="showcase-grid project-showcase-grid">{projects.length ? projects.map((project, index) => <button type="button" className={`project-showcase tone-${["ink", "sky", "plum", "meadow"][index % 4]}`} key={project.id} onClick={() => onProjectReady(project)}><div className="showcase-thumb"><span>GENERATED APP</span><strong>{project.name}</strong><p>{project.prompt}</p></div><footer><b>{project.name}</b><span>{new Date(project.updatedAt).toLocaleDateString("zh-CN")}</span></footer></button>) : <p className="gallery-empty">还没有生成项目。输入上方的想法后，第一个应用会显示在这里。</p>}</div> : <div className="showcase-grid">{samples.map((sample) => <article className="showcase-card" key={sample.title}><div className={`showcase-thumb tone-${sample.tone}`}><span>{sample.eyebrow}</span><strong>{sample.title}</strong><p>{sample.description}</p></div><footer><b>{sample.title}</b><span>{sample.description}</span></footer></article>)}</div>}
+      </section>
+    </section>
+  </main>;
 }
 
 function Builder({ project, back, startGeneration, onGenerationStarted }: { project: Project; back: () => void; startGeneration: boolean; onGenerationStarted: () => void }) {
