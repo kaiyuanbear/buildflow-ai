@@ -4,7 +4,7 @@ import { config } from "dotenv";
 import { buildApp } from "./app.js";
 import { getDatabase } from "./db/client.js";
 import { generationJobs } from "./db/schema.js";
-import { validateGeneratedApplication } from "./routes/generation.js";
+import { getQualityGaps, validateGeneratedApplication } from "./routes/generation.js";
 
 config({ path: "../../.env" });
 process.env.NODE_ENV = "test";
@@ -43,7 +43,15 @@ function runArtifactContractChecks() {
   expect(!generatedApplicationSchema.safeParse({ ...multiFile, files: [...multiFile.files, { path: "assets/logo.svg", language: "md", contents: "not allowed" }] }).success, "Multi-file artifacts must reject paths outside the whitelist.");
   expect(generatedApplicationSchema.safeParse({ appSpec, files: [{ path: "index.html", language: "html", contents: "<main />" }, { path: "styles.css", language: "css", contents: "" }, { path: "app.js", language: "js", contents: "" }] }).success, "Legacy artifacts without a manifest must remain compatible.");
   expect(validateGeneratedApplication(multiFile).manifest?.scripts.at(-1) === "src/app.js", "The API validator must accept the complete manifest artifact.");
+  expect(validateGeneratedApplication({ ...multiFile, appSpec: { appName: appSpec.appName, tagline: appSpec.tagline } }).appSpec.features.length >= 2, "The API validator must normalize absent display metadata without weakening artifact validation.");
   expectThrows(() => validateGeneratedApplication({ ...multiFile, files: multiFile.files.map((file) => file.path === "src/app.js" ? { ...file, contents: "import './state.js';" } : file) }), "The API validator must reject JavaScript imports.");
+  const qualityReady = {
+    ...multiFile,
+    files: multiFile.files.map((file) => file.path === "index.html" ? { ...file, contents: "<header></header><nav></nav><main></main><section></section><aside></aside><footer></footer>" } : file.path === "styles/layout.css" ? { ...file, contents: "main{display:grid}@media (max-width:640px){main{display:block}}" } : file.path === "src/app.js" ? { ...file, contents: "const seed=[{title:'demo'}];const panel=document.createElement('div');panel.addEventListener('click',()=>{});panel.addEventListener('change',()=>{});panel.addEventListener('input',()=>{});panel.addEventListener('keydown',()=>{});panel.textContent=seed[0].title;" } : file)
+  };
+  const blueprint = { complexityTarget: { minimumRegions: 5, minimumInteractions: 4, minimumDataEntities: 1, requiresResponsiveLayout: true } } as Parameters<typeof getQualityGaps>[1];
+  expect(getQualityGaps(validateGeneratedApplication(qualityReady), blueprint).length === 0, "A complete quality-ready artifact must pass deterministic quality checks.");
+  expect(getQualityGaps(validateGeneratedApplication(multiFile), blueprint).length > 0, "A structurally valid but sparse artifact must fail deterministic quality checks.");
 }
 
 async function call<T>(session: Session, method: "GET" | "POST" | "PUT" | "DELETE", url: string, payload?: unknown): Promise<ApiResult<T>> {

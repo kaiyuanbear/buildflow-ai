@@ -10,8 +10,8 @@ const versionParams = projectParams.extend({ versionId: z.string().uuid() });
 const workspaceQuery = z.object({ versionId: z.string().uuid().optional() });
 const generateBody = z.object({ instruction: z.string().trim().min(3).max(2_000).optional() });
 const legacyAllowedPaths = ["index.html", "styles.css", "app.js", "README.md"] as const;
-const modelTimeoutMs = 90_000;
-const wholeGenerationTimeoutMs = 250_000;
+const modelTimeoutMs = 100_000;
+const wholeGenerationTimeoutMs = 300_000;
 const generationBlueprintSchema = z.object({
   appName: z.string().min(2).max(80).catch("Generated Product"),
   tagline: z.string().min(2).max(160).catch("A focused browser application generated from your request."),
@@ -54,13 +54,21 @@ function createFallbackApplication(prompt: string): GeneratedApplication {
   });
 }
 
-const blueprintInstructions = `Return JSON only. You are designing a small, original browser-only single-page application from the user's product request. Do not write source code. Return exactly: {"appName":string,"tagline":string,"visualDirection":string,"regions":[{"name":string,"purpose":string}],"dataEntities":[{"name":string,"fields":[string]}],"interactions":[string],"acceptanceChecks":[string]}. Make 3-6 distinct regions, 3-6 useful local interactions, and a coherent visual direction. Do not choose from a fixed application catalog.`;
-const artifactInstructions = (blueprint: GenerationBlueprint) => `Return JSON only with exactly this shape: {"appSpec":{"appName":string,"tagline":string,"features":[string],"preview":{"entryPath":"index.html"},"plan":[{"stage":"analysis","message":string},{"stage":"planning","message":string},{"stage":"generation","message":string},{"stage":"validation","message":string}]},"files":[{"path":"index.html","language":"html","contents":string},{"path":"styles.css","language":"css","contents":string},{"path":"app.js","language":"js","contents":string},{"path":"README.md","language":"md","contents":string}]}. Build the application described by this validated blueprint: ${JSON.stringify(blueprint)}. Return exactly the four listed paths, no code fences, no external assets, packages, imports, fetch, external URLs, form actions, popups, parent access, storage APIs, or server code. Use plain DOM JavaScript. Include at least three page regions and three usable interactions. Never use localStorage or sessionStorage, even as a fallback. Start interactive state with const state = window.__BUILDFLOW_INITIAL_STATE__ || {}; after an edit call window.__BUILDFLOW_SAVE_STATE__(state). Make the layout responsive and visually intentional. Keep comments concise.`;
+const blueprintInstructions = `Return JSON only. You are designing a small, original browser-only application from the user's product request. Do not write source code and do not choose from a fixed application catalog. Return exactly: {"appName":string,"tagline":string,"visualDirection":string,"regions":[{"name":string,"purpose":string}],"dataEntities":[{"name":string,"fields":[string]}],"interactions":[string],"acceptanceChecks":[string],"complexityTarget":{"minimumRegions":5,"minimumInteractions":4,"minimumDataEntities":1,"requiresResponsiveLayout":true}}. Plan 5-6 distinct regions, 4-6 useful local interactions, meaningful initial data, and a coherent visual direction.`;
+const artifactInstructions = (blueprint: GenerationBlueprint) => `Return JSON only, with no code fences, and exactly this shape: {"appSpec":{"appName":string,"tagline":string,"features":[string],"preview":{"entryPath":"index.html"}},"manifest":{"styles":["styles/tokens.css","styles/layout.css"],"scripts":["src/state.js","src/ui.js","src/app.js"]},"files":[{"path":"index.html","language":"html","contents":string},{"path":"README.md","language":"md","contents":string},{"path":"styles/tokens.css","language":"css","contents":string},{"path":"styles/layout.css","language":"css","contents":string},{"path":"src/state.js","language":"js","contents":string},{"path":"src/ui.js","language":"js","contents":string},{"path":"src/app.js","language":"js","contents":string}]}. Build the application described by this validated blueprint: ${JSON.stringify(blueprint)}. Return 7-12 files: root index.html and README.md; 2-4 CSS files only under styles/; 3-7 JS files only under src/. The manifest must list every CSS and JS file exactly once in runtime order. index.html must contain markup only: never include a <script> or <link> element, whether inline or external. The preview runtime will inject manifest styles and scripts after validation. Never include images, font links, CDN URLs, iframe URLs, CSS url(), packages, imports, fetch, external URLs, form actions, popups, parent access, storage APIs, or server code. Use gradients, CSS shapes, emoji, or inline text instead of external assets. Use plain DOM JavaScript. The HTML must contain at least five semantic regions using main/header/nav/section/article/aside/footer. Implement at least four addEventListener interactions, meaningful initial data, a changing summary/progress/filter/detail result, and an @media narrow-screen layout. Never use localStorage or sessionStorage. Start state with window.__BUILDFLOW_INITIAL_STATE__ || {} and call window.__BUILDFLOW_SAVE_STATE__(state) after user edits. Keep each file focused on one responsibility.`;
 
 type GenerationOutcome = { application: GeneratedApplication; usedFallback: boolean; fallbackMessage?: string };
 
 const canonicalLanguageByPath: Record<string, "html" | "css" | "js" | "md"> = { "index.html": "html", "styles.css": "css", "app.js": "js", "README.md": "md" };
 const canonicalPathAliases: Record<string, keyof typeof canonicalLanguageByPath> = { "./index.html": "index.html", "./styles.css": "styles.css", "./app.js": "app.js", "./README.md": "README.md", "style.css": "styles.css", "main.css": "styles.css", "script.js": "app.js", "main.js": "app.js", "index.js": "app.js", "readme.md": "README.md" };
+
+function inferLanguage(path: string, current: unknown) {
+  if (path.endsWith(".html")) return "html";
+  if (path.endsWith(".css")) return "css";
+  if (path.endsWith(".js")) return "js";
+  if (path.endsWith(".md")) return "md";
+  return current;
+}
 
 function createReadmeFromPayload(value: Record<string, unknown>) {
   const spec = value.appSpec && typeof value.appSpec === "object" ? value.appSpec as Record<string, unknown> : {};
@@ -73,13 +81,19 @@ function normalizeApplicationPayload(value: unknown): unknown {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
   const payload = value as Record<string, unknown>;
   if (!Array.isArray(payload.files)) return payload;
+  const rawAppSpec = payload.appSpec && typeof payload.appSpec === "object" && !Array.isArray(payload.appSpec) ? payload.appSpec as Record<string, unknown> : {};
+  const appSpec = {
+    ...rawAppSpec,
+    features: Array.isArray(rawAppSpec.features) && rawAppSpec.features.length >= 2 ? rawAppSpec.features : ["本地交互", "响应式界面"],
+    preview: rawAppSpec.preview && typeof rawAppSpec.preview === "object" && !Array.isArray(rawAppSpec.preview) ? rawAppSpec.preview : { entryPath: "index.html" }
+  };
   const files: Array<Record<string, unknown>> = payload.files.filter((file): file is Record<string, unknown> => Boolean(file) && typeof file === "object" && !Array.isArray(file)).map((file) => {
     const rawPath = typeof file.path === "string" ? file.path.trim() : "";
-    const path = canonicalPathAliases[rawPath] ?? rawPath;
-    return { ...file, path, language: canonicalLanguageByPath[path] ?? file.language };
+    const path = canonicalPathAliases[rawPath] ?? rawPath.replace(/^\.\//, "");
+    return { ...file, path, language: canonicalLanguageByPath[path] ?? inferLanguage(path, file.language) };
   });
   if (!files.some((file) => file.path === "README.md")) files.push({ path: "README.md", language: "md", contents: createReadmeFromPayload(payload) });
-  return { ...payload, files };
+  return { ...payload, appSpec, files };
 }
 
 export function validateGeneratedApplication(value: unknown): GeneratedApplication {
@@ -88,9 +102,32 @@ export function validateGeneratedApplication(value: unknown): GeneratedApplicati
   if (application.appSpec.preview.entryPath !== "index.html" || new Set(paths).size !== paths.length) throw new Error("Generated artifact has invalid file paths.");
   if (!application.manifest && paths.some((path) => !(legacyAllowedPaths as readonly string[]).includes(path))) throw new Error("Generated artifact has invalid file paths.");
   const executableSource = application.files.filter((file) => file.language !== "md").map((file) => file.contents).join("\n");
-  const forbiddenCapability = /\b(localStorage|sessionStorage)\b/i.test(executableSource) ? "browser storage" : /\b(fetch|XMLHttpRequest|WebSocket|EventSource|navigator\.sendBeacon)\b/i.test(executableSource) ? "network access" : /\b(parent\.|top\.|document\.cookie|window\.open)\b/i.test(executableSource) ? "parent-window access" : /<form\b[^>]*\baction\s*=|<script\b[^>]*\bsrc\s*=|<link\b[^>]*\bhref\s*=|\burl\s*\(|\bimport\s*(?:\(|[\w{])|https?:\/\//i.test(executableSource) ? "external executable content" : null;
+  const forbiddenCapability = /\b(localStorage|sessionStorage)\b/i.test(executableSource) ? "browser storage" : /\b(fetch|XMLHttpRequest|WebSocket|EventSource|navigator\.sendBeacon)\b/i.test(executableSource) ? "network access" : /\b(parent\.|top\.|document\.cookie|window\.open)\b/i.test(executableSource) ? "parent-window access" : /<form\b[^>]*\baction\s*=|<script\b|<link\b|\burl\s*\(|\bimport\s*(?:\(|[\w{])|https?:\/\//i.test(executableSource) ? "external executable content" : null;
   if (forbiddenCapability) throw new Error(`Generated artifact uses a forbidden browser capability: ${forbiddenCapability}.`);
   return application;
+}
+
+export function getQualityGaps(application: GeneratedApplication, blueprint: GenerationBlueprint) {
+  if (!application.manifest) return ["未生成多文件 manifest"];
+  const html = application.files.find((file) => file.path === "index.html")?.contents ?? "";
+  const styles = application.files.filter((file) => file.language === "css").map((file) => file.contents).join("\n");
+  const scripts = application.files.filter((file) => file.language === "js").map((file) => file.contents).join("\n");
+  const semanticRegions = (html.match(/<(main|header|nav|section|article|aside|footer)\b/gi) ?? []).length;
+  const handlers = (scripts.match(/\.addEventListener\s*\(/g) ?? []).length;
+  const initialData = /(?:const|let)\s+[A-Za-z_$][\w$]*\s*=\s*(?:\[[\s\S]{3,}?\]|\{[\s\S]{3,}?\})/.test(scripts);
+  const stateFeedback = /(?:textContent|innerHTML|classList\.(?:add|remove|toggle)|style\.)/.test(scripts);
+  const gaps: string[] = [];
+  if (semanticRegions < blueprint.complexityTarget.minimumRegions) gaps.push(`页面区域不足 ${blueprint.complexityTarget.minimumRegions} 个`);
+  if (handlers < blueprint.complexityTarget.minimumInteractions) gaps.push(`交互处理不足 ${blueprint.complexityTarget.minimumInteractions} 个`);
+  if (!initialData) gaps.push("缺少首屏演示数据");
+  if (!stateFeedback) gaps.push("缺少随状态变化的反馈");
+  if (blueprint.complexityTarget.requiresResponsiveLayout && !/@media\s*\(/.test(styles)) gaps.push("缺少窄屏响应式布局");
+  return gaps;
+}
+
+function validateQuality(application: GeneratedApplication, blueprint: GenerationBlueprint) {
+  const gaps = getQualityGaps(application, blueprint);
+  if (gaps.length) throw new Error(`Generated artifact failed quality checks: ${gaps.join("；")}。`);
 }
 
 async function requestDeepSeekJson<T>(apiKey: string, system: string, user: string, maxTokens: number, deadline: number): Promise<T> {
@@ -112,6 +149,10 @@ async function requestDeepSeekJson<T>(apiKey: string, system: string, user: stri
 
 function fallbackReason(reason: unknown) {
   const message = reason instanceof Error ? reason.message : "未知的 AI 响应错误";
+  if (reason instanceof z.ZodError) {
+    const fields = [...new Set(reason.issues.map((issue) => issue.path.join(".")).filter(Boolean))].slice(0, 4);
+    return fields.length ? `生成结果缺少或不符合字段：${fields.join("、")}。` : "生成结果不符合多文件应用数据结构。";
+  }
   if (/timeout|deadline/i.test(message)) return "AI 请求超过了当前生成时限。";
   if (/status \d+/.test(message)) return "AI 服务未返回可用结果。";
   if (/output limit/i.test(message)) return "AI 响应超过了当前输出上限。";
@@ -120,8 +161,9 @@ function fallbackReason(reason: unknown) {
   if (/parent-window access/i.test(message)) return "生成应用使用了不支持的父窗口访问能力。";
   if (/external executable content/i.test(message)) return "生成应用包含不支持的外部可执行内容。";
   if (/forbidden browser capability/i.test(message)) return "生成应用使用了不支持的浏览器能力。";
-  if (/invalid file paths/i.test(message)) return "生成应用未返回要求的四文件结构。";
+  if (/invalid file paths/i.test(message)) return "生成应用未返回要求的文件结构。";
   if (/oversized file/i.test(message)) return "生成应用超过了单文件大小上限。";
+  if (/quality checks/i.test(message)) return message.replace(/^Generated artifact failed quality checks:\s*/i, "质量校验未通过：").replace(/。?$/, "");
   return "AI 响应未能通过 BuildFlow 的安全应用契约校验。";
 }
 
@@ -134,20 +176,24 @@ async function generateWithDeepSeek(prompt: string, emit: EmitEvent): Promise<Ge
   const deadline = Date.now() + wholeGenerationTimeoutMs;
   try {
     await emit("planning", "model_request", "active", "正在请求 AI 生成应用蓝图。", "应用蓝图");
-    const blueprint = generationBlueprintSchema.parse(await requestDeepSeekJson<unknown>(apiKey, blueprintInstructions, prompt, 2_000, deadline));
+    const blueprint = generationBlueprintSchema.parse(await requestDeepSeekJson<unknown>(apiKey, blueprintInstructions, prompt, 2_500, deadline));
     await emit("planning", "model_response", "succeeded", "已校验应用结构、交互设计与视觉方向。", "应用蓝图");
-    await emit("generation", "model_request", "active", "正在请求 AI 生成浏览器端源文件。", "index.html、styles.css、app.js");
+    await emit("planning", "validation", "succeeded", `已规划 ${blueprint.complexityTarget.minimumRegions} 个页面区域、${blueprint.complexityTarget.minimumInteractions} 个交互与响应式布局。`, "复杂度目标");
+    await emit("generation", "model_request", "active", "正在请求 AI 生成多文件浏览器应用。", "7–12 个生成文件");
     let application: GeneratedApplication;
     try {
-      application = validateGeneratedApplication(await requestDeepSeekJson<unknown>(apiKey, artifactInstructions(blueprint), prompt, 12_000, deadline));
+      application = validateGeneratedApplication(await requestDeepSeekJson<unknown>(apiKey, artifactInstructions(blueprint), prompt, 18_000, deadline));
+      validateQuality(application, blueprint);
     } catch (reason) {
       const repairReason = fallbackReason(reason);
-      await emit("generation", "validation", "active", "检测到约束问题，正在请求一次受限修复。", repairReason);
-      const repairInstructions = `${artifactInstructions(blueprint)} A previous candidate was rejected: ${repairReason} Return a complete replacement artifact. Never use localStorage, sessionStorage, fetch, external URLs, imports, form actions, popups, parent/top access, or document.cookie.`;
-      application = validateGeneratedApplication(await requestDeepSeekJson<unknown>(apiKey, repairInstructions, prompt, 12_000, deadline));
+      await emit("generation", "validation", "active", "检测到安全或质量问题，正在请求一次受限修复。", repairReason);
+      const repairInstructions = `${artifactInstructions(blueprint)} A previous candidate was rejected: ${repairReason} Return a complete replacement artifact that satisfies every file, security, and quality rule. Never use localStorage, sessionStorage, fetch, external URLs, imports, CSS url(), form actions, popups, parent/top access, or document.cookie.`;
+      application = validateGeneratedApplication(await requestDeepSeekJson<unknown>(apiKey, repairInstructions, prompt, 18_000, deadline));
+      validateQuality(application, blueprint);
     }
-    await emit("generation", "model_response", "succeeded", "已接收结构化浏览器应用产物。", "4 个生成文件");
-    await emit("validation", "validation", "succeeded", "已校验文件路径、预览入口、大小限制与浏览器安全约束。");
+    await emit("generation", "model_response", "succeeded", "已接收结构化多文件浏览器应用产物。", `${application.files.length} 个生成文件`);
+    await emit("validation", "validation", "succeeded", "已校验文件路径、预览入口、大小限制与浏览器安全约束。", "结构与安全校验");
+    await emit("validation", "validation", "succeeded", "已通过区域、交互、演示数据、状态反馈与响应式质量校验。", "质量校验");
     return { application, usedFallback: false };
   } catch (reason) {
     const message = fallbackReason(reason);
@@ -255,7 +301,8 @@ export const registerGenerationRoutes: FastifyPluginAsync = async (app) => {
       const application = result.application;
       if (result.usedFallback) await emit("generation", "status", "skipped", `已使用本地可交互起步应用。${result.fallbackMessage ?? "AI 暂时不可用。"}`);
       const versions = await db.select({ id: projectVersions.id }).from(projectVersions).where(eq(projectVersions.projectId, projectId));
-      const [version] = await db.insert(projectVersions).values({ projectId, sequence: String(versions.length + 1), appSpec: application.appSpec, summary: application.appSpec.tagline }).returning();
+      const appSpec = application.manifest ? { ...application.appSpec, artifactManifest: application.manifest } : application.appSpec;
+      const [version] = await db.insert(projectVersions).values({ projectId, sequence: String(versions.length + 1), appSpec, summary: application.appSpec.tagline }).returning();
       if (!version) throw new Error("Could not create project version");
       await emit("persistence", "version_save", "succeeded", "已为通过校验的产物创建不可变版本。", `v${version.sequence}`);
       await db.insert(generatedFiles).values(application.files.map((file) => ({ versionId: version.id, ...file })));
