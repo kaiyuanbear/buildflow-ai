@@ -55,3 +55,7 @@
 - [ ] README documents setup, testing, deployment, demo flow, and scope decisions.
 - [x] `.env` is ignored and `.env.example` has no secrets. (Git and built-client scan verified on 2026-09-28.)
 - [ ] Public deployment is smoke-tested with a new account.
+
+## Latest regression evidence
+
+- [x] TodoList prompt regression request reached the local API after safe artifact normalization; temporary project cleanup ran on 2026-09-28. API and Web TypeScript checks pass. (The local API QA script could not be launched afterward because the Windows host reported `ENOMEM` while another development process was active; manual browser verification remains required.)

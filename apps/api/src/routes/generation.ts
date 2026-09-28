@@ -33,33 +33,56 @@ function createFallbackApplication(prompt: string): GeneratedApplication {
   const promptText = safeJson(prompt);
   return generatedApplicationSchema.parse({
     appSpec: {
-      appName: "BuildFlow Starter",
-      tagline: "A locally generated interactive starter for your idea.",
-      features: ["Capture requirements", "Add ideas", "Keep work in the preview"],
+      appName: "BuildFlow 本地起步应用",
+      tagline: "AI 暂时不可用时，为你的想法生成的本地可交互起步应用。",
+      features: ["记录需求", "添加想法", "在预览中继续完善"],
       preview: { entryPath: "index.html" },
       plan: [
-        { stage: "analysis", message: "Reviewed the requested product outcome." },
-        { stage: "planning", message: "Prepared a lightweight single-page application plan." },
-        { stage: "generation", message: "Created a browser-only interactive starter application." },
-        { stage: "validation", message: "Prepared files for isolated preview execution." }
+        { stage: "analysis", message: "已理解产品需求与核心使用场景。" },
+        { stage: "planning", message: "已准备轻量单页应用方案。" },
+        { stage: "generation", message: "已创建浏览器端可交互起步应用。" },
+        { stage: "validation", message: "已准备隔离预览所需文件。" }
       ]
     },
     files: [
-      { path: "index.html", language: "html", contents: "<main class=\"app\"><p class=\"eyebrow\">GENERATED STARTER</p><h1 id=\"title\"></h1><p id=\"prompt\"></p><form id=\"idea-form\"><input id=\"idea\" placeholder=\"Add a product idea\" maxlength=\"120\" required><button>Save idea</button></form><ul id=\"ideas\"></ul></main>" },
+      { path: "index.html", language: "html", contents: "<main class=\"app\"><p class=\"eyebrow\">本地起步应用</p><h1 id=\"title\"></h1><p id=\"prompt\"></p><form id=\"idea-form\"><input id=\"idea\" placeholder=\"输入一个产品想法\" maxlength=\"120\" required><button>保存想法</button></form><ul id=\"ideas\"></ul></main>" },
       { path: "styles.css", language: "css", contents: "*{box-sizing:border-box}body{margin:0;background:#f4f6fb;color:#1b2437;font-family:Inter,system-ui,sans-serif}.app{max-width:760px;margin:8vh auto;padding:44px;background:#fff;border:1px solid #e5e8f0;border-radius:24px;box-shadow:0 18px 55px #17204014}.eyebrow{color:#635bdb;font-size:12px;font-weight:800;letter-spacing:.12em}h1{font-size:38px;margin:8px 0}#prompt{color:#5d6677;line-height:1.6}form{display:flex;gap:8px;margin:28px 0}input{flex:1;padding:12px;border:1px solid #ccd3e2;border-radius:10px}button{border:0;border-radius:10px;padding:12px 16px;background:#635bdb;color:#fff;font-weight:700;cursor:pointer}li{margin:8px 0;padding:12px;border-radius:10px;background:#f4f5ff}" },
-      { path: "app.js", language: "js", contents: `const request=${promptText};const state=window.__BUILDFLOW_INITIAL_STATE__||{ideas:[]};document.querySelector('#title').textContent='Your generated product';document.querySelector('#prompt').textContent=request;const list=document.querySelector('#ideas');function render(){list.innerHTML='';state.ideas.forEach((idea)=>{const item=document.createElement('li');item.textContent=idea;list.append(item)})}document.querySelector('#idea-form').addEventListener('submit',(event)=>{event.preventDefault();const input=document.querySelector('#idea');state.ideas.push(input.value.trim());input.value='';window.__BUILDFLOW_SAVE_STATE__(state);render()});render();` },
-      { path: "README.md", language: "md", contents: "Generated locally because no usable AI response was available. Configure DEEPSEEK_API_KEY to produce a custom application from the prompt." }
+      { path: "app.js", language: "js", contents: `const request=${promptText};const state=window.__BUILDFLOW_INITIAL_STATE__||{ideas:[]};document.querySelector('#title').textContent='你的应用原型';document.querySelector('#prompt').textContent=request;const list=document.querySelector('#ideas');function render(){list.innerHTML='';state.ideas.forEach((idea)=>{const item=document.createElement('li');item.textContent=idea;list.append(item)})}document.querySelector('#idea-form').addEventListener('submit',(event)=>{event.preventDefault();const input=document.querySelector('#idea');state.ideas.push(input.value.trim());input.value='';window.__BUILDFLOW_SAVE_STATE__(state);render()});render();` },
+      { path: "README.md", language: "md", contents: "当前未取得可用的 AI 产物，因此使用本地起步应用。配置服务端 DEEPSEEK_API_KEY 后可按提示词生成定制应用。" }
     ]
   });
 }
 
 const blueprintInstructions = `Return JSON only. You are designing a small, original browser-only single-page application from the user's product request. Do not write source code. Return exactly: {"appName":string,"tagline":string,"visualDirection":string,"regions":[{"name":string,"purpose":string}],"dataEntities":[{"name":string,"fields":[string]}],"interactions":[string],"acceptanceChecks":[string]}. Make 3-6 distinct regions, 3-6 useful local interactions, and a coherent visual direction. Do not choose from a fixed application catalog.`;
-const artifactInstructions = (blueprint: GenerationBlueprint) => `Return JSON only with exactly this shape: {"appSpec":{"appName":string,"tagline":string,"features":[string],"preview":{"entryPath":"index.html"},"plan":[{"stage":"analysis","message":string},{"stage":"planning","message":string},{"stage":"generation","message":string},{"stage":"validation","message":string}]},"files":[{"path":"index.html","language":"html","contents":string},{"path":"styles.css","language":"css","contents":string},{"path":"app.js","language":"js","contents":string},{"path":"README.md","language":"md","contents":string}]}. Build the application described by this validated blueprint: ${JSON.stringify(blueprint)}. Return exactly the four listed paths, no code fences, no external assets, packages, imports, fetch, external URLs, form actions, popups, parent access, storage APIs, or server code. Use plain DOM JavaScript. Include at least three page regions and three usable interactions. For persisted preview state, read window.__BUILDFLOW_INITIAL_STATE__ || {} and call window.__BUILDFLOW_SAVE_STATE__(state) after user edits. Make the layout responsive and visually intentional. Keep comments concise.`;
+const artifactInstructions = (blueprint: GenerationBlueprint) => `Return JSON only with exactly this shape: {"appSpec":{"appName":string,"tagline":string,"features":[string],"preview":{"entryPath":"index.html"},"plan":[{"stage":"analysis","message":string},{"stage":"planning","message":string},{"stage":"generation","message":string},{"stage":"validation","message":string}]},"files":[{"path":"index.html","language":"html","contents":string},{"path":"styles.css","language":"css","contents":string},{"path":"app.js","language":"js","contents":string},{"path":"README.md","language":"md","contents":string}]}. Build the application described by this validated blueprint: ${JSON.stringify(blueprint)}. Return exactly the four listed paths, no code fences, no external assets, packages, imports, fetch, external URLs, form actions, popups, parent access, storage APIs, or server code. Use plain DOM JavaScript. Include at least three page regions and three usable interactions. Never use localStorage or sessionStorage, even as a fallback. Start interactive state with const state = window.__BUILDFLOW_INITIAL_STATE__ || {}; after an edit call window.__BUILDFLOW_SAVE_STATE__(state). Make the layout responsive and visually intentional. Keep comments concise.`;
 
 type GenerationOutcome = { application: GeneratedApplication; usedFallback: boolean; fallbackMessage?: string };
 
+const canonicalLanguageByPath: Record<string, "html" | "css" | "js" | "md"> = { "index.html": "html", "styles.css": "css", "app.js": "js", "README.md": "md" };
+const canonicalPathAliases: Record<string, keyof typeof canonicalLanguageByPath> = { "./index.html": "index.html", "./styles.css": "styles.css", "./app.js": "app.js", "./README.md": "README.md", "style.css": "styles.css", "main.css": "styles.css", "script.js": "app.js", "main.js": "app.js", "index.js": "app.js", "readme.md": "README.md" };
+
+function createReadmeFromPayload(value: Record<string, unknown>) {
+  const spec = value.appSpec && typeof value.appSpec === "object" ? value.appSpec as Record<string, unknown> : {};
+  const name = typeof spec.appName === "string" ? spec.appName : "生成应用";
+  const tagline = typeof spec.tagline === "string" ? spec.tagline : "由 BuildFlow AI 生成的浏览器端应用。";
+  return `# ${name}\n\n${tagline}\n\n此应用仅在 BuildFlow 的隔离浏览器预览中运行。`;
+}
+
+function normalizeApplicationPayload(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const payload = value as Record<string, unknown>;
+  if (!Array.isArray(payload.files)) return payload;
+  const files: Array<Record<string, unknown>> = payload.files.filter((file): file is Record<string, unknown> => Boolean(file) && typeof file === "object" && !Array.isArray(file)).map((file) => {
+    const rawPath = typeof file.path === "string" ? file.path.trim() : "";
+    const path = canonicalPathAliases[rawPath] ?? rawPath;
+    return { ...file, path, language: canonicalLanguageByPath[path] ?? file.language };
+  });
+  if (!files.some((file) => file.path === "README.md")) files.push({ path: "README.md", language: "md", contents: createReadmeFromPayload(payload) });
+  return { ...payload, files };
+}
+
 function validateApplication(value: unknown): GeneratedApplication {
-  const application = generatedApplicationSchema.parse(value);
+  const application = generatedApplicationSchema.parse(normalizeApplicationPayload(value));
   const paths = application.files.map((file) => file.path);
   if (application.appSpec.preview.entryPath !== "index.html" || application.files.length !== allowedPaths.length || new Set(paths).size !== paths.length || allowedPaths.some((path) => !paths.includes(path))) throw new Error("Generated artifact has invalid file paths.");
   if (application.files.some((file) => Buffer.byteLength(file.contents, "utf8") > 55_000)) throw new Error("Generated artifact contains an oversized file.");
@@ -87,43 +110,43 @@ async function requestDeepSeekJson<T>(apiKey: string, system: string, user: stri
 }
 
 function fallbackReason(reason: unknown) {
-  const message = reason instanceof Error ? reason.message : "Unknown AI response error";
-  if (/timeout|deadline/i.test(message)) return "The AI request exceeded the configured generation limit.";
-  if (/status \d+/.test(message)) return "The AI service did not return a usable response.";
-  if (/output limit/i.test(message)) return "The AI response exceeded the configured output limit.";
-  if (/browser storage/i.test(message)) return "The generated application requested unsupported browser storage.";
-  if (/network access/i.test(message)) return "The generated application requested unsupported network access.";
-  if (/parent-window access/i.test(message)) return "The generated application requested unsupported parent-window access.";
-  if (/external executable content/i.test(message)) return "The generated application included unsupported external executable content.";
-  if (/forbidden browser capability/i.test(message)) return "The generated application requested an unsupported browser capability.";
-  if (/invalid file paths/i.test(message)) return "The generated application did not return the required four-file layout.";
-  if (/oversized file/i.test(message)) return "The generated application exceeded the per-file size limit.";
-  return "The AI response did not match BuildFlow's safe application contract.";
+  const message = reason instanceof Error ? reason.message : "未知的 AI 响应错误";
+  if (/timeout|deadline/i.test(message)) return "AI 请求超过了当前生成时限。";
+  if (/status \d+/.test(message)) return "AI 服务未返回可用结果。";
+  if (/output limit/i.test(message)) return "AI 响应超过了当前输出上限。";
+  if (/browser storage/i.test(message)) return "生成应用使用了不支持的浏览器存储能力。";
+  if (/network access/i.test(message)) return "生成应用使用了不支持的网络访问能力。";
+  if (/parent-window access/i.test(message)) return "生成应用使用了不支持的父窗口访问能力。";
+  if (/external executable content/i.test(message)) return "生成应用包含不支持的外部可执行内容。";
+  if (/forbidden browser capability/i.test(message)) return "生成应用使用了不支持的浏览器能力。";
+  if (/invalid file paths/i.test(message)) return "生成应用未返回要求的四文件结构。";
+  if (/oversized file/i.test(message)) return "生成应用超过了单文件大小上限。";
+  return "AI 响应未能通过 BuildFlow 的安全应用契约校验。";
 }
 
 async function generateWithDeepSeek(prompt: string, emit: EmitEvent): Promise<GenerationOutcome> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey || process.env.NODE_ENV === "test") {
-    await emit("generation", "model_request", "skipped", "Skipped the AI request; using the local starter artifact.");
-    return { application: createFallbackApplication(prompt), usedFallback: true, fallbackMessage: "No server-side AI key is configured." };
+    await emit("generation", "model_request", "skipped", "未发起 AI 请求，正在使用本地起步应用。");
+    return { application: createFallbackApplication(prompt), usedFallback: true, fallbackMessage: "服务端未配置可用的 AI 密钥。" };
   }
   const deadline = Date.now() + wholeGenerationTimeoutMs;
   try {
-    await emit("planning", "model_request", "active", "Requesting an application blueprint from the AI model.", "application blueprint");
+    await emit("planning", "model_request", "active", "正在请求 AI 生成应用蓝图。", "应用蓝图");
     const blueprint = generationBlueprintSchema.parse(await requestDeepSeekJson<unknown>(apiKey, blueprintInstructions, prompt, 2_000, deadline));
-    await emit("planning", "model_response", "succeeded", "Validated the application structure, interactions, and visual direction.", "application blueprint");
-    await emit("generation", "model_request", "active", "Requesting browser-only source files from the AI model.", "index.html, styles.css, app.js");
+    await emit("planning", "model_response", "succeeded", "已校验应用结构、交互设计与视觉方向。", "应用蓝图");
+    await emit("generation", "model_request", "active", "正在请求 AI 生成浏览器端源文件。", "index.html、styles.css、app.js");
     let application: GeneratedApplication;
     try {
       application = validateApplication(await requestDeepSeekJson<unknown>(apiKey, artifactInstructions(blueprint), prompt, 12_000, deadline));
     } catch (reason) {
       const repairReason = fallbackReason(reason);
-      await emit("generation", "validation", "active", "Requesting one bounded safety repair for the generated artifact.", repairReason);
+      await emit("generation", "validation", "active", "检测到约束问题，正在请求一次受限修复。", repairReason);
       const repairInstructions = `${artifactInstructions(blueprint)} A previous candidate was rejected: ${repairReason} Return a complete replacement artifact. Never use localStorage, sessionStorage, fetch, external URLs, imports, form actions, popups, parent/top access, or document.cookie.`;
       application = validateApplication(await requestDeepSeekJson<unknown>(apiKey, repairInstructions, prompt, 12_000, deadline));
     }
-    await emit("generation", "model_response", "succeeded", "Received a structured browser application artifact.", "4 generated files");
-    await emit("validation", "validation", "succeeded", "Validated file paths, preview entry, size limits, and browser safety constraints.");
+    await emit("generation", "model_response", "succeeded", "已接收结构化浏览器应用产物。", "4 个生成文件");
+    await emit("validation", "validation", "succeeded", "已校验文件路径、预览入口、大小限制与浏览器安全约束。");
     return { application, usedFallback: false };
   } catch (reason) {
     const message = fallbackReason(reason);
@@ -207,8 +230,8 @@ export const registerGenerationRoutes: FastifyPluginAsync = async (app) => {
     if (active.length) return reply.code(409).send({ code: "GENERATION_ALREADY_RUNNING" });
 
     const initialLogs: GenerationLogEntry[] = [
-      eventAt("analysis", "status", "succeeded", instruction ? "Received the original request and an optimization instruction." : "Received the product request and created an Agent generation task."),
-      eventAt("analysis", "validation", "succeeded", "Applied the browser-only preview and safety constraints.")
+      eventAt("analysis", "status", "succeeded", instruction ? "已接收原始需求与本次优化要求。" : "已接收产品需求，已创建 Agent 生成任务。"),
+      eventAt("analysis", "validation", "succeeded", "已应用浏览器预览与安全约束。")
     ];
     let job;
     try {
@@ -229,23 +252,23 @@ export const registerGenerationRoutes: FastifyPluginAsync = async (app) => {
       const effectivePrompt = instruction ? `${project.prompt}\n\nOptimization request for the next version:\n${instruction}` : project.prompt;
       const result = await generateWithDeepSeek(effectivePrompt, emit);
       const application = result.application;
-      if (result.usedFallback) await emit("generation", "status", "skipped", `Using a local interactive starter artifact. ${result.fallbackMessage ?? "AI generation was unavailable."}`);
+      if (result.usedFallback) await emit("generation", "status", "skipped", `已使用本地可交互起步应用。${result.fallbackMessage ?? "AI 暂时不可用。"}`);
       const versions = await db.select({ id: projectVersions.id }).from(projectVersions).where(eq(projectVersions.projectId, projectId));
       const [version] = await db.insert(projectVersions).values({ projectId, sequence: String(versions.length + 1), appSpec: application.appSpec, summary: application.appSpec.tagline }).returning();
       if (!version) throw new Error("Could not create project version");
-      await emit("persistence", "version_save", "succeeded", "Created an immutable project version for the validated artifact.", `v${version.sequence}`);
+      await emit("persistence", "version_save", "succeeded", "已为通过校验的产物创建不可变版本。", `v${version.sequence}`);
       await db.insert(generatedFiles).values(application.files.map((file) => ({ versionId: version.id, ...file })));
-      for (const file of application.files) await emit("persistence", "file_write", "succeeded", "Saved the generated source file.", file.path);
+      for (const file of application.files) await emit("persistence", "file_write", "succeeded", "已保存生成源文件。", file.path);
       await db.insert(projectPreviewStates).values({ projectId, versionId: version.id, state: {} });
       await db.update(projects).set({ currentVersionId: version.id, updatedAt: new Date() }).where(eq(projects.id, projectId));
-      await emit("persistence", "preview_ready", "succeeded", "Initialized isolated preview state and made the version current.", `v${version.sequence}`);
+      await emit("persistence", "preview_ready", "succeeded", "已初始化隔离预览状态，并设为当前版本。", `v${version.sequence}`);
       const [completedJob] = await db.update(generationJobs).set({ status: "completed", stage: "validation", logs, completedAt: new Date() }).where(eq(generationJobs.id, jobId)).returning();
       return reply.code(201).send({ job: completedJob, version, files: application.files });
     } catch (reason) {
-      const message = reason instanceof Error ? reason.message : "Generation failed";
-      await emit("validation", "validation", "failed", "Generation stopped before a usable preview could be saved.");
+      const message = reason instanceof Error ? reason.message : "生成失败";
+      await emit("validation", "validation", "failed", "构建在保存可用预览前停止。");
       await db.update(generationJobs).set({ status: "failed", stage: "validation", logs, failureReason: message, completedAt: new Date() }).where(eq(generationJobs.id, jobId));
-      return reply.code(502).send({ code: "GENERATION_FAILED", message: "Unable to generate the application. Please try again." });
+      return reply.code(502).send({ code: "GENERATION_FAILED", message: "暂时无法生成应用，请稍后重试。" });
     }
   });
 };

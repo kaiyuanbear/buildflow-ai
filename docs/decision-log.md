@@ -31,3 +31,7 @@ The Atoms-inspired home gallery has `发现`, `我的项目`, and `模板` views
 ## 2026-09-28: truthful events and two-stage generation
 
 BuildFlow AI records structured server-side execution events rather than exposing model reasoning or simulating unavailable tools. DeepSeek first returns a validated application blueprint, then returns a validated browser-only artifact. Thinking mode remains disabled; all model output is JSON-validated, sandboxed, and subject to bounded output/time limits with a local fallback.
+
+## 2026-09-28: safe structural artifact normalization
+
+Before strict validation, BuildFlow AI only normalizes harmless response-shape differences that do not change executable content: common canonical file aliases, canonical language labels, and a missing non-executable README. The resulting artifact must still contain exactly the four allow-listed files and pass the existing size and browser-capability checks. This improves model compatibility without weakening the sandbox contract.
