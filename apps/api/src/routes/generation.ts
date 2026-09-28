@@ -102,7 +102,7 @@ export function validateGeneratedApplication(value: unknown): GeneratedApplicati
   if (application.appSpec.preview.entryPath !== "index.html" || new Set(paths).size !== paths.length) throw new Error("Generated artifact has invalid file paths.");
   if (!application.manifest && paths.some((path) => !(legacyAllowedPaths as readonly string[]).includes(path))) throw new Error("Generated artifact has invalid file paths.");
   const executableSource = application.files.filter((file) => file.language !== "md").map((file) => file.contents).join("\n");
-  const forbiddenCapability = /\b(localStorage|sessionStorage)\b/i.test(executableSource) ? "browser storage" : /\b(fetch|XMLHttpRequest|WebSocket|EventSource|navigator\.sendBeacon)\b/i.test(executableSource) ? "network access" : /\b(parent\.|top\.|document\.cookie|window\.open)\b/i.test(executableSource) ? "parent-window access" : /<form\b[^>]*\baction\s*=|<script\b|<link\b|\burl\s*\(|\bimport\s*(?:\(|[\w{])|https?:\/\//i.test(executableSource) ? "external executable content" : null;
+  const forbiddenCapability = /\b(localStorage|sessionStorage)\b/i.test(executableSource) ? "browser storage" : /\b(fetch|XMLHttpRequest|WebSocket|EventSource|navigator\.sendBeacon)\b/i.test(executableSource) ? "network access" : /\b(parent\.|top\.|document\.cookie|window\.open)\b/i.test(executableSource) ? "parent-window access" : /<form\b[^>]*\baction\s*=|<script\b|<link\b|\burl\s*\(|\bimport\s*(?:\(|[\w{"'])|https?:\/\//i.test(executableSource) ? "external executable content" : null;
   if (forbiddenCapability) throw new Error(`Generated artifact uses a forbidden browser capability: ${forbiddenCapability}.`);
   return application;
 }

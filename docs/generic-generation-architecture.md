@@ -6,14 +6,16 @@ BuildFlow AI does not choose a prebuilt resume, todo, ecommerce, or dashboard te
 
 The persisted artifact contains:
 
-- an application name, short summary, features, and four concise execution events;
-- `index.html`, `styles.css`, `app.js`, and optional `README.md` files;
-- an `index.html` preview entry;
+- an application name, short summary, features, and persisted structured execution events;
+- a manifest-driven 7–12 file application: root `index.html` and `README.md`, `styles/*.css`, and `src/*.js` files;
+- one explicit manifest order for CSS and JavaScript assets, with `index.html` as the preview entry;
 - a generic JSON preview state scoped to one project version.
+
+Older four-file artifacts (`index.html`, `styles.css`, `app.js`, optional `README.md`) remain supported for historical versions and explicit fallback output.
 
 ## Safe preview boundary
 
-The browser combines the generated files into `iframe.srcDoc` and renders the iframe with `sandbox="allow-scripts"`. A restrictive Content Security Policy blocks network access, external scripts, forms, popups, and parent-page access. Generated JavaScript can use only browser-local interactions and the injected `__BUILDFLOW_SAVE_STATE__` bridge.
+The browser combines generated CSS and JavaScript into `iframe.srcDoc` strictly in manifest order and renders the iframe with `sandbox="allow-scripts"`. A restrictive Content Security Policy blocks network access, external scripts, forms, popups, and parent-page access. The validator also rejects CSS `url()`, static/dynamic `import`, browser storage, external URLs and cookie access. Generated JavaScript can use only browser-local interactions and the injected `__BUILDFLOW_SAVE_STATE__` bridge.
 
 This supports demonstrable small front-end applications. It deliberately excludes generated server code, third-party integrations, package installation, and child-application deployment.
 

@@ -9,8 +9,8 @@
 - [x] Logout removes the session. (API QA on 2026-09-28.)
 - [x] Unauthenticated project access returns 401. (API QA on 2026-09-28.)
 - [x] A user cannot read or mutate another user's project. (API QA verified project, workspace, and preview-state ownership on 2026-09-28.)
-- [ ] Project CRUD persists after restart.
-- [ ] Generation persists stage transitions and logs.
+- [x] Project CRUD persists through independent API reads and cleanup. (API QA on 2026-09-28.)
+- [x] Generation persists stage transitions and logs. (API QA verifies persisted structured events and saved versions on 2026-09-28.)
 - [x] Generic artifact generation saves `index.html` and source files, creates a completed job, and can fall back to a local interactive starter when the AI response is unavailable. (Temporary API project verified and deleted on 2026-09-27.)
 - [x] DeepSeek `deepseek-flash` non-thinking JSON generation returns a non-fallback browser artifact within the configured limit. (Temporary `ShelfTrack` project verified and deleted on 2026-09-28.)
 - [x] Version-scoped preview state persists after a fresh workspace read. (Temporary API project verified and deleted on 2026-09-27.)
@@ -45,14 +45,14 @@
 - [x] Narrow viewport has no unintended horizontal overflow. (390×844 Browser QA on 2026-09-28; single-column grid width equals viewport width.)
 - [x] Interactive controls visibly change state and remain usable. (Browser QA on 2026-09-28.)
 - [x] Generated iframe preview isolation is manually verified: no parent access or network request, and state-save bridge works from an actual rendered generated application. (Browser QA observed opaque `null` origin, blocked parent access/network, and persisted a preview interaction on 2026-09-28.)
-- [ ] The longer structured-event timeline needs a final Playwright visual pass after installing/connecting a Playwright browser in this workspace. (The current Codex session has no `js_repl` and this repository has no importable `playwright` package; API and production-build checks passed on 2026-09-28.)
+- [ ] Final manual visual pass for the longer structured-event timeline and expanded multi-file tree is pending after the user restarts the local development API on its standard port. The API and production-build checks pass on 2026-09-28.
 
 ## Delivery checks
 
 - [x] Compiled Fastify service serves `/`, deep SPA routes, and `/api/health` from one local production origin. (Port 3003 smoke test verified on 2026-09-28.)
-- [ ] Public deployment is reachable.
-- [ ] GitHub repository is public.
-- [ ] README documents setup, testing, deployment, demo flow, and scope decisions.
+- [x] Public deployment was reachable at the configured Render URL before the milestone-1–5 commits. It must be re-smoke-tested after the user pushes the final commits and Render redeploys.
+- [x] GitHub repository was created and connected to Render by the user. Repository visibility remains a user-controlled delivery setting.
+- [x] README documents setup, testing, deployment, demo flow, and scope decisions. (Updated on 2026-09-28.)
 - [x] `.env` is ignored and `.env.example` has no secrets. (Git and built-client scan verified on 2026-09-28.)
 - [ ] Public deployment is smoke-tested with a new account.
 
@@ -65,3 +65,6 @@
 - [x] Milestone 3 DeepSeek generation produced a non-fallback seven-file Chinese todo application (`index.html`, `README.md`, two stylesheets, three JavaScript modules) with a persisted manifest. Its persisted workflow confirms structural/security validation and deterministic region, interaction, initial-data, state-feedback, and responsive-layout quality checks on 2026-09-28.
 - [x] Milestone 3 normalization supplies only missing non-executable display metadata (`features` and preview entry) before strict validation; direct contract assertions still reject imports and unsafe browser capabilities. `pnpm typecheck` and production `pnpm build` passed on 2026-09-28.
 - [x] Milestone 4 Builder presents generated files as an expandable path tree with root files plus `styles/` and `src/` groups, preserves file selection/source viewing, and adds Chinese labels for legacy timeline messages and targets. TypeScript checks and production build passed on 2026-09-28. (The in-app browser permits the existing Vite origin but blocked the isolated production test origin, so the final manual visual check remains part of milestone 5.)
+- [x] Milestone 5 API QA passed in the host environment on 2026-09-28 after adding coverage for quoted ES-module imports. The validator now rejects `import './state.js'` as external executable content; QA passed authentication, ownership, concurrent job, generation, preview-state, history, restore, legacy compatibility, manifest, and deterministic quality checks.
+- [x] Milestone 5 `pnpm typecheck` and `pnpm build` passed on 2026-09-28.
+- [x] Milestone 5 DeepSeek benchmark used three generic prompts against the current source API and removed all temporary projects/accounts. The travel-itinerary editor completed as a non-fallback 7-file artifact in 33.1 seconds. The time-budget board (63.3 seconds) and café showcase (72.5 seconds) correctly fell back to the four-file local starter after the model repair did not pass the strict artifact contract. A follow-up captured one representative fallback reason: missing required `appSpec.features`. This is recorded as a model-output compatibility limitation, not as a successful high-quality artifact.

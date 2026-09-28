@@ -39,3 +39,7 @@ Before strict validation, BuildFlow AI only normalizes harmless response-shape d
 ## 2026-09-28: manifest-driven quality artifacts
 
 New model-generated applications use a 7-12 file browser-only artifact with an explicit manifest: CSS files live under `styles/`, JavaScript files live under `src/`, and `index.html` remains markup-only. The preview assembles those files deterministically inside its sandbox. The API permits one bounded repair, then checks minimum semantic regions, local interactions, initial data, visible state feedback, and a narrow-screen media query before it persists a version. Legacy four-file artifacts remain readable for older projects.
+
+## 2026-09-28: fail closed on module imports
+
+The generated-artifact validator explicitly rejects both dynamic imports and static imports with quoted module specifiers. The preview has no module loader and the product boundary forbids dependency/module resolution, so accepting `import './state.js'` would create a misleading or unsafe execution path. Multi-file scripts instead share the sandboxed iframe global scope in manifest order.
