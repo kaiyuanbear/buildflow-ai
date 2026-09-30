@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { buildPreviewDocument } from "./preview";
+import { buildPreviewDocument, type PreviewBridgeMessage } from "./preview";
 
 type User = { id: string; email: string };
 type Project = { id: string; name: string; prompt: string; updatedAt: string };
@@ -9,9 +9,11 @@ type ShowcaseItem = { title: string; description: string; eyebrow: string; tone:
 type GeneratedFile = { path: string; language: string; contents: string };
 type VersionSummary = { id: string; sequence: string; summary: string; createdAt: string; appSpec: { appName: string; tagline: string; features: string[]; artifactManifest?: { styles: string[]; scripts: string[] }; generationRequest?: { prompt: string; instruction?: string } } };
 type GenerationLog = { message: string; createdAt?: string; stage?: string; phase?: string; kind?: string; status?: "pending" | "active" | "succeeded" | "failed" | "skipped"; target?: string };
+type GenerationJob = { id: string; versionId: string | null; status: "queued" | "running" | "completed" | "failed"; stage: string | null; logs: GenerationLog[]; failureReason: string | null; createdAt: string };
 type Workspace = {
   project: { currentVersionId: string | null };
-  job: { status: "queued" | "running" | "completed" | "failed"; stage: string | null; logs: GenerationLog[]; failureReason: string | null } | null;
+  job: GenerationJob | null;
+  jobs: GenerationJob[];
   version: VersionSummary | null;
   files: GeneratedFile[];
   previewState: Record<string, unknown>;
@@ -153,7 +155,7 @@ function Home({ user, logout, onProjectReady }: { user: User; logout: () => Prom
       </nav>
       <p className="nav-caption">最近</p>
       <div className="recent-projects" aria-label="最近项目">
-        {projects.map((project) => <button className="recent" key={project.id} onClick={() => onProjectReady(project)}>◌ {project.name}</button>)}
+        {projects.map((project) => <button className="recent" key={project.id} title={project.prompt} aria-label={`打开项目：${project.prompt}`} onClick={() => onProjectReady(project)}>◌ {project.name}</button>)}
       </div>
       <button className="signout" onClick={logout}>退出登录</button>
     </aside>
@@ -253,18 +255,50 @@ function Builder({ project, back, startGeneration, onGenerationStarted }: { proj
   }
 
   const selected = data?.files.find((item) => item.path === file) ?? data?.files[0];
-  const document = useMemo(() => buildPreviewDocument(data?.files ?? [], data?.previewState ?? {}, data?.version?.appSpec.artifactManifest), [data?.files, data?.previewState, data?.version?.appSpec.artifactManifest]);
+  // The iframe owns live interaction state after its initial mount. Rebuilding
+  // srcDoc for every successful state-save reloads the entire sandbox and
+  // returns the user to the top of the generated page. A new version or a new
+  // artifact still intentionally creates a new preview with its saved state.
+  const document = useMemo(() => buildPreviewDocument(data?.files ?? [], data?.previewState ?? {}, data?.version?.appSpec.artifactManifest), [data?.files, data?.version?.id, data?.version?.appSpec.artifactManifest]);
+  useEffect(() => { setPreviewError(null); }, [document]);
   useEffect(() => {
+    const versionId = data?.version?.id;
+    let pendingState: Record<string, unknown> | null = null;
+    let saveTimer: number | undefined;
+    let saving = false;
+
+    const flushPreviewState = () => {
+      if (saving || !pendingState || !versionId) return;
+      const state = pendingState;
+      pendingState = null;
+      saving = true;
+      request(`/api/projects/${project.id}/versions/${versionId}/preview-state`, { method: "PUT", body: JSON.stringify(state) })
+        .catch(() => setPreviewError("预览状态保存失败"))
+        .finally(() => {
+          saving = false;
+          if (pendingState) flushPreviewState();
+        });
+    };
+
     const onMessage = (event: MessageEvent) => {
-      const payload = event.data as { source?: string; type?: string; state?: unknown };
-      if (event.source !== frameRef.current?.contentWindow || payload?.source !== "buildflow-preview" || payload.type !== "save-state" || !payload.state || typeof payload.state !== "object" || Array.isArray(payload.state) || !data?.version) return;
-      request<{ previewState: Record<string, unknown> }>(`/api/projects/${project.id}/versions/${data.version.id}/preview-state`, { method: "PUT", body: JSON.stringify(payload.state) })
-        .then((result) => setData((current) => current ? { ...current, previewState: result.previewState } : current))
-        .catch(() => setPreviewError("预览状态保存失败"));
+      const payload = event.data as PreviewBridgeMessage | undefined;
+      if (event.source !== frameRef.current?.contentWindow || payload?.source !== "buildflow-preview") return;
+      if (payload.type === "runtime-error") {
+        const location = payload.filename ? ` (${payload.filename}${payload.line ? `:${payload.line}${payload.column ? `:${payload.column}` : ""}` : ""})` : "";
+        setPreviewError(`预览运行错误：${payload.message ?? "未知错误"}${location}`);
+        return;
+      }
+      if (payload.type !== "save-state" || !payload.state || typeof payload.state !== "object" || Array.isArray(payload.state) || !versionId) return;
+      pendingState = payload.state;
+      window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(flushPreviewState, 240);
     };
     window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [project.id, data?.version]);
+    return () => {
+      window.removeEventListener("message", onMessage);
+      window.clearTimeout(saveTimer);
+    };
+  }, [project.id, data?.version?.id]);
 
   const isHistoricalVersion = Boolean(data?.version && data.version.id !== data.project.currentVersionId);
   const statusText = isGenerating || data?.job?.status === "running" ? "智能体正在构建应用" : data?.job?.status === "failed" ? "构建失败" : data?.version ? "构建完成" : "等待构建";

@@ -10,9 +10,12 @@
     "dev": "pnpm --parallel --filter @buildflow/api --filter @buildflow/web dev",
     "build": "pnpm --filter @buildflow/contracts build && pnpm --filter @buildflow/api build && pnpm --filter @buildflow/web build",
     "typecheck": "pnpm --filter @buildflow/contracts typecheck && pnpm --filter @buildflow/api typecheck && pnpm --filter @buildflow/web typecheck",
-    "lint": "pnpm --filter @buildflow/contracts lint && pnpm --filter @buildflow/api lint && pnpm --filter @buildflow/web lint"
+    "lint": "pnpm --filter @buildflow/contracts lint && pnpm --filter @buildflow/api lint && pnpm --filter @buildflow/web lint",
+    "playwright": "playwright",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "typescript": "^5.7.3"
   }
 }

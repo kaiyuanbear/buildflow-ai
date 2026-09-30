@@ -55,6 +55,18 @@ export const complexityTargetSchema = z.object({
 }).strict();
 export type ComplexityTarget = z.infer<typeof complexityTargetSchema>;
 
+/**
+ * The dimensions an optimization request is explicitly allowed to change.
+ * Absent or false values preserve the corresponding capability of the
+ * previous generated version.
+ */
+export const incrementalChangeScopeSchema = z.object({
+  productPurpose: z.boolean(),
+  interactions: z.boolean(),
+  fileStructure: z.boolean()
+}).strict();
+export type IncrementalChangeScope = z.infer<typeof incrementalChangeScopeSchema>;
+
 export const generationPlanStepSchema = z.object({
   stage: generationStageSchema,
   message: z.string().min(4).max(240)
@@ -92,7 +104,8 @@ export const storedAppSpecSchema = appSpecSchema.extend({
   artifactManifest: generatedArtifactManifestSchema.optional(),
   generationRequest: z.object({
     prompt: z.string().min(3).max(2_000),
-    instruction: z.string().min(3).max(2_000).optional()
+    instruction: z.string().min(3).max(2_000).optional(),
+    changeScope: incrementalChangeScopeSchema.optional()
   }).optional()
 });
 export type StoredAppSpec = z.infer<typeof storedAppSpecSchema>;

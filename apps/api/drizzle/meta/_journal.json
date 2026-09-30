@@ -29,6 +29,13 @@
       "when": 1790528597583,
       "tag": "0003_hard_master_chief",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790582400000,
+      "tag": "0004_job_version_lineage",
+      "breakpoints": true
     }
   ]
 }
